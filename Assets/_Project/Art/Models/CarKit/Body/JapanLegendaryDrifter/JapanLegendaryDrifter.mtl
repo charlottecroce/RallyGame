@@ -1,0 +1,45 @@
+# Blender MTL File: 'JapanLegendaryDrifter.blend'
+# Material Count: 4
+
+newmtl Material.001
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\egorz\\Racing\\Assets\\PSXStyleCars\\body\\JapanLegendaryDrifter\\MaterialsAndTextures\\texture.png
+
+newmtl Material.003
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.618565 0.025664
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd MaterialsAndTextures\\texture1.png
+
+newmtl Material.004
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.007997 0.014882
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd MaterialsAndTextures\\texture2.png
+
+newmtl Material.005
+Ns 680.625030
+Ka 1.000000 1.000000 1.000000
+Kd 0.013968 0.013968 0.013968
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2

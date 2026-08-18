@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77518c3fd0997263ca2247ec549a99ed, type: 3}
+  m_Name: Part_Radiator_Stock
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Parts.Data.PartDefinition
+  id: Part_New
+  displayName: New Part
+  description: 
+  slot: 0
+  quality: 0.4
+  basePrice: 400
+  fullRepairCost: 250
+  degradePerKm: 0.0015
+  impactWeight: 0.35
+  healthyThreshold: 0.5
+  requiredToStart: 0
+  enginePower: 0
+  turboBoost: 0
+  coolingRate: 1
+  gearShiftSpeed: 0
+  clutchEfficiency: 0
+  suspensionStiffness: 0
+  steeringResponse: 0
+  brakeForce: 0
+  gripBonus: 0
+  massDelta: 0
+  lightRange: 0

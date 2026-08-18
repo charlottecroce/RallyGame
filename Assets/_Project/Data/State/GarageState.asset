@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ea106e44b3ab27b79fadfc7b1b0560f, type: 3}
+  m_Name: GarageState
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Garage.GarageState
+  database: {fileID: 11400000, guid: 6fa7986f27a7a722fb86232fd404fbd5, type: 2}
+  onGarageChanged: {fileID: 11400000, guid: 822edbf081f5b3ec9977f57cd952bc01, type: 2}
+  onActiveCarChanged: {fileID: 11400000, guid: f5874a1f453611ca384966e63c6db33d, type: 2}

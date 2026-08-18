@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c5c6de7dc0372b2bba7eb0a4886f1a5, type: 3}
+  m_Name: Car_Coupe1
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Data.CarDefinition
+  id: Car_Coupe1
+  displayName: Coupe
+  thumbnail: {fileID: 0}
+  prefab: {fileID: 8059068872417526180, guid: cd56b5c83f94a5b0d94b824d92723261, type: 3}
+  basePrice: 3500
+  massKg: 950
+  centerOfMassOffset: {x: 0, y: -0.35, z: 0}
+  drivetrain: 0
+  peakTorqueNm: 180
+  torqueCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0.55
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0.85
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  idleRpm: 900
+  redlineRpm: 6800
+  gearRatios:
+  - 3.4
+  - 2.1
+  - 1.5
+  - 1.1
+  - 0.86
+  reverseRatio: 3.2
+  finalDrive: 4.1
+  shiftTime: 0.35
+  maxSteerAngle: 32
+  highSpeedSteerScale: 0.35
+  brakeTorque: 2200
+  handbrakeTorque: 3000
+  baseForwardGrip: 1.4
+  baseSidewaysGrip: 1.5
+  topSpeedKph: 140
+  defaultParts:
+  - {fileID: 11400000, guid: 95f7d5888d0c4fcd7b899c8235a4e61d, type: 2}
+  - {fileID: 11400000, guid: fc3f8ddedb54ab31dadbf72d765b829f, type: 2}
+  - {fileID: 11400000, guid: 4c36c0413cf5a54c0bd9043d1b1263f0, type: 2}
+  - {fileID: 11400000, guid: 2f32d63bd81b059e8b1b8e2d4e91ed56, type: 2}
+  - {fileID: 11400000, guid: a91ef45312b9a7617a68bbf1a3c18fcc, type: 2}
+  - {fileID: 11400000, guid: 05ccb1b3b4437c6f2acd59e12466843f, type: 2}
+  - {fileID: 11400000, guid: de36023223987599c8c2c1c429bcbe2e, type: 2}
+  - {fileID: 11400000, guid: 9709781efb08b59558d115591a00a99e, type: 2}
+  - {fileID: 11400000, guid: 001bbb6fbd6f39d67b2bb53217e787f2, type: 2}
+  - {fileID: 11400000, guid: 2d2f9405e66952619bfb9be211f56dca, type: 2}
+  - {fileID: 11400000, guid: 89f93ac8298cb0d1b920bfcf4931d359, type: 2}
+  - {fileID: 11400000, guid: 991834d1c52e2cbfe98da8ebc6776f78, type: 2}
+  defaultTireCompound: 0

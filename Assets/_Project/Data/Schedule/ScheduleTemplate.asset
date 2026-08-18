@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 70c225b95e5f432a4991b9c0e051429f, type: 3}
+  m_Name: ScheduleTemplate
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Races.Data.ScheduleTemplate
+  casualSlots:
+  - day: 2
+    startHour: 13
+    endHour: 16
+  - day: 3
+    startHour: 20
+    endHour: 24
+  rallyDays:
+  - day: 4
+    startHour: 18
+    endHour: 22
+    stageCount: 2
+  - day: 5
+    startHour: 10
+    endHour: 18
+    stageCount: 3
+  - day: 6
+    startHour: 14
+    endHour: 18
+    stageCount: 2
+  rallyLocations:
+  - {fileID: 11400000, guid: 2cc660b36b51a57da8129010c464e894, type: 2}
+  casualLocations:
+  - {fileID: 11400000, guid: 2cc660b36b51a57da8129010c464e894, type: 2}

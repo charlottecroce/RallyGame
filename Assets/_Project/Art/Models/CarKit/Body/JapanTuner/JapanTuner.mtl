@@ -1,0 +1,66 @@
+# Blender MTL File: 'JapanTuner.blend'
+# Material Count: 6
+
+newmtl Material.001
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.791298 0.000304 0.000304
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+
+newmtl Material.002
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.068696 0.070104 0.072972
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+
+newmtl Material.003
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\egorz\\OneDrive\\Dokumenty\\Racing\\Assets\\PSXStyleCars\\JapanTuner\\Снимок экрана 2022-04-22 170709.png
+map_Ke C:\\Users\\egorz\\OneDrive\\Dokumenty\\Racing\\Assets\\PSXStyleCars\\JapanTuner\\Снимок экрана 2022-04-22 170709.png
+
+newmtl Material.004
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.002069 0.002069 0.002069
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+
+newmtl Material.005
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.009291 0.018730
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\egorz\\OneDrive\\Dokumenty\\Racing\\Assets\\PSXStyleCars\\JapanTuner\\Снимок экрана 2022-04-22 170823.png
+map_Ke C:\\Users\\egorz\\OneDrive\\Dokumenty\\Racing\\Assets\\PSXStyleCars\\JapanTuner\\Снимок экрана 2022-04-22 170823.png
+
+newmtl Material.006
+Ns 625.000015
+Ka 1.000000 1.000000 1.000000
+Kd 0.012982 0.012982 0.012982
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
