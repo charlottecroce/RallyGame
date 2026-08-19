@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5100778befb782baa9c9c8333a898145, type: 3}
+  m_Name: RoadSurfaces
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Roads.RoadSurfaceTable
+  surfaces:
+  - {fileID: 11400000, guid: cc37e317fd5b69d7aaf13d363cab8dc5, type: 2}
+  - {fileID: 11400000, guid: cc2cfe7a0c22c1adc946472c71ed7822, type: 2}
+  - {fileID: 11400000, guid: b458caab727f3a8629b37478211f117c, type: 2}
+  - {fileID: 11400000, guid: a22debfa18b65422a88545f914d0c45d, type: 2}
+  offRoad: {fileID: 11400000, guid: e319eb175a781e03caa4201cfc84fd05, type: 2}

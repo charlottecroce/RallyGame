@@ -11,7 +11,7 @@ namespace RallyGame.Input
     /// so swapping to an InputActions asset later means editing only this file.
     ///
     /// Sample() runs every frame. Move, Look, throttle, brake and steer are NEVER
-    /// logged. Only one-shot presses (E, Esc, M, Tab, L, Space) are, and only at
+    /// logged. Only one-shot presses (E, Esc, M, Tab, L, R, Space) are, and only at
     /// Verbose so they can be switched off in one click.
     [CreateAssetMenu(menuName = "Rally/Input Reader", fileName = "InputReader")]
     public class InputReader : ScriptableObject
@@ -25,6 +25,7 @@ namespace RallyGame.Input
         public bool MapPressed { get; private set; }
         public bool RaceBookPressed { get; private set; }
         public bool LightsPressed { get; private set; }
+        public bool ResetPressed { get; private set; }
         public VehicleInput Vehicle { get; private set; }
 
         [SerializeField] private float lookSensitivity = 0.12f;
@@ -65,6 +66,7 @@ namespace RallyGame.Input
             MapPressed = kb.mKey.wasPressedThisFrame;
             RaceBookPressed = kb.tabKey.wasPressedThisFrame;
             LightsPressed = kb.lKey.wasPressedThisFrame;
+            ResetPressed = kb.rKey.wasPressedThisFrame;
 
             Vehicle = new VehicleInput
             {
@@ -86,6 +88,7 @@ namespace RallyGame.Input
             MapPressed = UnityEngine.Input.GetKeyDown(KeyCode.M);
             RaceBookPressed = UnityEngine.Input.GetKeyDown(KeyCode.Tab);
             LightsPressed = UnityEngine.Input.GetKeyDown(KeyCode.L);
+            ResetPressed = UnityEngine.Input.GetKeyDown(KeyCode.R);
 
             Vehicle = new VehicleInput
             {
@@ -114,6 +117,7 @@ namespace RallyGame.Input
         {
             GameLog.Verbose(LogCat.Input, "Input cleared (menu took focus)", this);
             Move = Vector2.zero; Look = Vector2.zero; Vehicle = default;
+            ResetPressed = false;
         }
 
         // ---- debug ---------------------------------------------------------
@@ -128,6 +132,7 @@ namespace RallyGame.Input
             if (MapPressed)      GameLog.Verbose(LogCat.Input, "Key: M (map)", this);
             if (RaceBookPressed) GameLog.Verbose(LogCat.Input, "Key: Tab (race book)", this);
             if (JumpPressed)     GameLog.Verbose(LogCat.Input, "Key: Space (jump / handbrake)", this);
+            if (ResetPressed)    GameLog.Verbose(LogCat.Input, "Key: R (reset car)", this);
         }
     }
 }

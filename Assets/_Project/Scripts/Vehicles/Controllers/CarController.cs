@@ -8,10 +8,15 @@ namespace RallyGame.Vehicles.Controllers
     /// WheelCollider-based arcade-sim controller. Knows nothing about parts, saves
     /// or races - it only consumes VehicleInput and ResolvedCarStats.
     ///
+    /// It also knows nothing about roads. CarSurfaceSampler decides what is under the
+    /// tyres and hands down one multiplier through SetSurfaceGrip; the controller just
+    /// folds it into the friction curves. Same split as parts: something else resolves,
+    /// this applies.
+    ///
     /// LOGGING RULE FOR THIS FILE: FixedUpdate runs 50x/second and Update runs every
-    /// frame. Nothing inside them logs directly. Instead, gear/light/engine state is
-    /// compared against the last logged value and only reported when it CHANGES.
-    /// Throttle, brake, steer, RPM and wheel poses are never logged at all.
+    /// frame. Nothing inside them logs directly. Instead, gear/light/engine/surface
+    /// state is compared against the last logged value and only reported when it
+    /// CHANGES. Throttle, brake, steer, RPM and wheel poses are never logged at all.
     [RequireComponent(typeof(Rigidbody))]
     public class CarController : MonoBehaviour, IVehicleController
     {
@@ -63,11 +68,13 @@ namespace RallyGame.Vehicles.Controllers
         private float currentSteer;
         private float rpm;
         private float tractionScale = 1f;
+        private float surfaceGrip = 1f;    // owned by CarSurfaceSampler, applied here
 
         // Change-detection state so per-frame code can log without spamming.
         private int lastLoggedGear = int.MinValue;
         private bool lastLoggedLights;
         private bool lightsLogPrimed;
+        private bool lastHandbrake;
 
         public Transform Root => transform;
         public float SpeedKph => rb ? rb.Velocity().magnitude * 3.6f : 0f;
@@ -78,7 +85,13 @@ namespace RallyGame.Vehicles.Controllers
         public Rigidbody Body => rb;
         public ResolvedCarStats Stats => stats;
         public float TractionScale => tractionScale;
-        
+        public float SurfaceGrip => surfaceGrip;
+
+        /// Exposed so recovery code (CarUnstick) can tell "parked" from "flooring it
+        /// against a tree". Read-only by convention - only SetInput writes it.
+        public VehicleInput CurrentInput => input;
+        public bool ControlEnabled => controlEnabled;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody>();
@@ -134,6 +147,18 @@ namespace RallyGame.Vehicles.Controllers
 
         public void SetInput(in VehicleInput i) => input = i;   // per-frame, never logged
 
+        /// Multiplier from whatever the tyres are standing on. 1 = the tarmac reference.
+        /// Deliberately not part of IVehicleController: a controller with no wheels
+        /// (an AI ghost, a replay) has no use for it.
+        public void SetSurfaceGrip(float multiplier)
+        {
+            float clamped = Mathf.Clamp(multiplier, 0.1f, 2f);
+            if (Mathf.Approximately(clamped, surfaceGrip)) return;
+
+            surfaceGrip = clamped;
+            ApplyFriction();      // edge-driven: curves are rewritten on change, not per step
+        }
+
         public void SetControlEnabled(bool enabled)
         {
             if (controlEnabled == enabled) return;
@@ -178,6 +203,8 @@ namespace RallyGame.Vehicles.Controllers
             transform.SetPositionAndRotation(position, rotation);
             gear = 1; shiftTimer = 0f;
             tractionScale = 1f;
+            surfaceGrip = 1f;          // the sampler re-establishes this on the next step
+            ApplyFriction();
         }
 
         private void FixedUpdate()
@@ -186,6 +213,7 @@ namespace RallyGame.Vehicles.Controllers
             UpdateSteering();
             UpdateDrive();
             UpdateBrakes();
+            ApplyHandbrakeGrip();
             AntiRoll();
 
             ReportGearChange();   // change-detection only: silent unless the gear moved
@@ -278,6 +306,16 @@ namespace RallyGame.Vehicles.Controllers
             }
         }
 
+        /// The handbrake's rear grip drop lives in the friction curve, which is only
+        /// rewritten on change. Without this edge check it would only ever take effect
+        /// if a stat happened to change mid-slide.
+        private void ApplyHandbrakeGrip()
+        {
+            if (input.handbrake == lastHandbrake) return;
+            lastHandbrake = input.handbrake;
+            ApplyFriction();
+        }
+
         private void ApplyFriction()
         {
             foreach (var w in wheels)
@@ -285,12 +323,13 @@ namespace RallyGame.Vehicles.Controllers
                 if (!w.collider) continue;
 
                 var fwd = w.collider.forwardFriction;
-                fwd.stiffness = Mathf.Max(0.2f, stats.forwardGrip);
+                fwd.stiffness = Mathf.Max(0.2f, stats.forwardGrip * surfaceGrip);
                 w.collider.forwardFriction = fwd;
 
                 var side = w.collider.sidewaysFriction;
                 // Handbrake slides need a rear grip drop; do it on the friction curve, not by faking torque.
-                side.stiffness = Mathf.Max(0.2f, stats.sidewaysGrip * (input.handbrake && w.handbraked ? 0.55f : 1f));
+                side.stiffness = Mathf.Max(0.2f, stats.sidewaysGrip * surfaceGrip *
+                                                 (input.handbrake && w.handbraked ? 0.55f : 1f));
                 w.collider.sidewaysFriction = side;
 
                 var spring = w.collider.suspensionSpring;

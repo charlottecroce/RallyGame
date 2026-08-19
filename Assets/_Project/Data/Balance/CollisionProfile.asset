@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee2ec5620042c060da4399beb58f498b, type: 3}
+  m_Name: CollisionProfile
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Physics.CollisionProfile
+  carBodyMaterial: {fileID: 13400000, guid: 514527d9c92ace22290df7cf4211971c, type: 2}
+  propMaterial: {fileID: 13400000, guid: 662e62ab732626a54bc8d5666c1afc7c, type: 2}
+  maxDepenetrationVelocity: 3
+  solverIterations: 12
+  solverVelocityIterations: 4
+  collisionDetection: 2
+  propLayerName: Prop

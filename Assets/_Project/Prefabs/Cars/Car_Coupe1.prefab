@@ -1034,6 +1034,9 @@ GameObject:
   - component: {fileID: 3460521866515297128}
   - component: {fileID: 5239346924681036921}
   - component: {fileID: -6243030879523469303}
+  - component: {fileID: 359436792341869634}
+  - component: {fileID: 4914877490982036109}
+  - component: {fileID: 8616489974109633626}
   m_Layer: 0
   m_Name: Car_Coupe1
   m_TagString: Untagged
@@ -1268,6 +1271,60 @@ MonoBehaviour:
   intervalSeconds: 1
   onlyWhileMoving: 0
   reportCollidersOnStart: 1
+--- !u!114 &359436792341869634
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8059068872417526180}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c52e7ce1d1039ba3994ad66b1d2bf75, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Controllers.CarSurfaceSampler
+  surfaceTable: {fileID: 11400000, guid: 0c99d698a871d9af8bbd2fac7f8cc487, type: 2}
+  weather: {fileID: 11400000, guid: 8488adeceb32250918590d25eeacf897, type: 2}
+  blendRate: 6
+  updateThreshold: 0.01
+  stepsBetweenSamples: 2
+  logSurfaceChanges: 1
+--- !u!114 &4914877490982036109
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8059068872417526180}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d4484829240708ae9cce65057e30c82, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Controllers.CarBodyCollision
+  profile: {fileID: 11400000, guid: 37d4725c64c053e51bf29e10486e6616, type: 2}
+  auditOnStart: 1
+  lowColliderTolerance: 0.02
+--- !u!114 &8616489974109633626
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8059068872417526180}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94216ba474f081976a14c3dcfae31234, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Controllers.CarUnstick
+  stuckSpeedKph: 2
+  minDriverDemand: 0.15
+  nudgeAfterSeconds: 1.2
+  resetAfterSeconds: 6
+  separationSpeed: 1.6
+  reseatForce: 6000
+  nudgeCooldown: 0.6
+  groundNormalAngle: 40
+  onStuckBeyondRecovery: {fileID: 11400000, guid: 8d5952b3e960b8b76b253743a7c2c54f, type: 2}
 --- !u!1 &8616923726716009983
 GameObject:
   m_ObjectHideFlags: 0

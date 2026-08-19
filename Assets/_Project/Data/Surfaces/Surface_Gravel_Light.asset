@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 774e65985c80a034f86b88dd9f93c368, type: 3}
+  m_Name: Surface_Gravel_Light
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Roads.RoadSurface
+  id: gravel_light
+  displayName: Light Gravel
+  material: {fileID: 2100000, guid: a76c0682a8fdc6a23b3a910cd0c247fc, type: 2}
+  uvTilesPerMetre: 0.12
+  dryGrip: 0.78
+  wetGrip: 0.55
+  defaultWidth: 6
+  shoulderWidth: 0.6
+  shoulderDrop: 0.1
+  heightOffset: 0.06
+  physicsMaterial: {fileID: 0}
