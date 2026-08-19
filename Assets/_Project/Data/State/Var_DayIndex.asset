@@ -9,9 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: e8d1541a261c696098de2331f8ad971f, type: 3}
   m_Name: Var_DayIndex
-  m_EditorClassIdentifier: Assembly-CSharp:RallyGame.Core:IntVariable
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Core.IntVariable
   initialValue: 0
   changed: {fileID: 11400000, guid: 83b8955b54b17a4eb9cbcdb3c43f6902, type: 2}
   logPolicy: 0

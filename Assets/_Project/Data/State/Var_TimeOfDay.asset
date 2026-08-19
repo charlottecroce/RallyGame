@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2599afb41c9f43d4eb8350fcb7246bd7, type: 3}
+  m_Script: {fileID: 11500000, guid: 5ebd4b3aa729547ff89bbc19bf074f2c, type: 3}
   m_Name: Var_TimeOfDay
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Core.FloatVariable
   initialValue: 8
