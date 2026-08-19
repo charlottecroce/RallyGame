@@ -15,7 +15,7 @@ MonoBehaviour:
   id: Part_New
   displayName: New Part
   description: 
-  slot: 0
+  slot: 1
   quality: 0.4
   basePrice: 400
   fullRepairCost: 250

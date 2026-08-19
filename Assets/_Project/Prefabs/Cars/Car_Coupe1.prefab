@@ -360,6 +360,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 341abf770dec19824a36720cc2235f46, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Controllers.CarDoorInteractable
+  warnWhenUnbound: 1
 --- !u!1 &4538257590258479717
 GameObject:
   m_ObjectHideFlags: 0
@@ -1111,8 +1112,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1, y: 0.6495119, z: 2.7429366}
-  m_Center: {x: 0, y: 0.11195144, z: 0.14650607}
+  m_Size: {x: 1, y: 0.6180007, z: 2.7429366}
+  m_Center: {x: 0, y: 0.12770703, z: 0.14650607}
 --- !u!114 &4282512099422472276
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1155,6 +1156,7 @@ MonoBehaviour:
   steerSmoothing: 8
   engineBrakeTorque: 180
   antiRollForce: 4000
+  logGearChanges: 1
 --- !u!114 &5980517457964587922
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1176,6 +1178,8 @@ MonoBehaviour:
   damageProperty: _DamageAmount
   impactThreshold: 2500
   damagePerImpulse: 0.00004
+  odometerLogEveryKm: 1
+  logIgnoredImpacts: 0
 --- !u!114 &5832562187903467274
 MonoBehaviour:
   m_ObjectHideFlags: 0

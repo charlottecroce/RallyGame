@@ -15,7 +15,7 @@ MonoBehaviour:
   id: Part_New
   displayName: New Part
   description: 
-  slot: 0
+  slot: 6
   quality: 0.4
   basePrice: 400
   fullRepairCost: 250
@@ -23,14 +23,14 @@ MonoBehaviour:
   impactWeight: 0.4
   healthyThreshold: 0.5
   requiredToStart: 0
-  enginePower: 0
-  turboBoost: 0
-  coolingRate: 0
-  gearShiftSpeed: 0
-  clutchEfficiency: 0
+  enginePower: 1
+  turboBoost: 1
+  coolingRate: 1
+  gearShiftSpeed: 1
+  clutchEfficiency: 1
   suspensionStiffness: 1
-  steeringResponse: 0
-  brakeForce: 0
-  gripBonus: 0
+  steeringResponse: 1
+  brakeForce: 1
+  gripBonus: 1
   massDelta: 0
   lightRange: 0
