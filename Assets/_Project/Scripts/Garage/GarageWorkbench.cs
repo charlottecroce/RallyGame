@@ -8,6 +8,9 @@ namespace RallyGame.Garage
     {
         [SerializeField] private GarageState garage;
         [SerializeField] private BoolVariable playerInGarage;
+        [Tooltip("Shared with CarHoodInspectable and GarageView. The hood leaves this true; " +
+                 "the workbench clears it so the panel always opens editable.")]
+        [SerializeField] private BoolVariable inspectOnly;
         [SerializeField] private GameEvent onOpenGarageUi;
 
         public bool CanInteract => garage.ActiveCar != null && (playerInGarage == null || playerInGarage.Value);
@@ -32,6 +35,10 @@ namespace RallyGame.Garage
             GameLog.Action(LogCat.Garage, "Workbench opened",
                            $"active car '{car.instanceId}' ({car.definitionId}), " +
                            $"{car.installedPartInstanceIds.Count} fitted part(s)", this);
+
+            // The hood box leaves this true. Clear it so the workbench always opens
+            // editable, whatever opened the panel last.
+            if (inspectOnly) inspectOnly.Value = false;
 
             onOpenGarageUi?.Raise();
         }

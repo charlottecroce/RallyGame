@@ -35,6 +35,18 @@ namespace RallyGame.Vehicles.Controllers
         [SerializeField] private float engineBrakeTorque = 180f;
         [SerializeField] private float antiRollForce = 4000f;
 
+        [Header("Traction")]
+        [Tooltip("Cuts drive torque when the driven wheels start spinning. Off = raw torque, " +
+                 "which on a light FWD car means wheelspin from every standstill.")]
+        [SerializeField] private bool tractionControl = true;
+        [Tooltip("Forward slip allowed before torque is pulled back. Lower = more grip, less drama.")]
+        [SerializeField] private float maxForwardSlip = 0.35f;
+        [Tooltip("How fast torque is cut once slip is detected.")]
+        [SerializeField] private float tractionCutRate = 8f;
+        [Tooltip("How fast torque returns once grip is back. Deliberately slower than the cut " +
+                 "so the two rates cannot oscillate against each other.")]
+        [SerializeField] private float tractionRestoreRate = 2f;
+
         [Header("Debug")]
         [Tooltip("Log every gear change. Turn off if automatic shifting makes this chatty.")]
         [SerializeField] private bool logGearChanges = true;
@@ -50,6 +62,7 @@ namespace RallyGame.Vehicles.Controllers
         private float shiftTimer;
         private float currentSteer;
         private float rpm;
+        private float tractionScale = 1f;
 
         // Change-detection state so per-frame code can log without spamming.
         private int lastLoggedGear = int.MinValue;
@@ -63,7 +76,9 @@ namespace RallyGame.Vehicles.Controllers
         public bool EngineRunning => engineRunning;
         public float NormalisedRpm => def ? Mathf.InverseLerp(def.idleRpm, def.redlineRpm, rpm) : 0f;
         public Rigidbody Body => rb;
-
+        public ResolvedCarStats Stats => stats;
+        public float TractionScale => tractionScale;
+        
         private void Awake()
         {
             rb = GetComponent<Rigidbody>();
@@ -162,6 +177,7 @@ namespace RallyGame.Vehicles.Controllers
             rb.SetAngularVelocity(Vector3.zero);
             transform.SetPositionAndRotation(position, rotation);
             gear = 1; shiftTimer = 0f;
+            tractionScale = 1f;
         }
 
         private void FixedUpdate()
@@ -200,7 +216,7 @@ namespace RallyGame.Vehicles.Controllers
                 ? Mathf.Lerp(rpm, Mathf.Clamp(targetRpm, def.idleRpm, def.redlineRpm), Time.fixedDeltaTime * 6f)
                 : 0f;
 
-            if (!engineRunning || !controlEnabled) { SetMotorTorque(0f); return; }
+            if (!engineRunning || !controlEnabled) { SetMotorTorque(0f); tractionScale = 1f; return; }
 
             AutoShift(targetRpm);
 
@@ -212,6 +228,23 @@ namespace RallyGame.Vehicles.Controllers
 
             // Engine braking when coasting.
             if (input.throttle < 0.05f && SpeedKph > 2f) torque = -engineBrakeTorque * ratio;
+
+            // There is no clutch slip or driveline inertia in this model, so full
+            // first-gear torque lands in a single physics step and the tires are
+            // already sliding before the car has moved. Scale drive back toward
+            // whatever the contact patch will actually take.
+            if (tractionControl && torque > 0f)
+            {
+                float slip = PeakDrivenForwardSlip();
+                float target = slip > maxForwardSlip ? Mathf.Clamp01(maxForwardSlip / slip) : 1f;
+                float rate = target < tractionScale ? tractionCutRate : tractionRestoreRate;
+                tractionScale = Mathf.MoveTowards(tractionScale, target, Time.fixedDeltaTime * rate);
+                torque *= tractionScale;
+            }
+            else
+            {
+                tractionScale = 1f;
+            }
 
             SetMotorTorque(torque / DrivenWheelCount());
         }
@@ -354,6 +387,22 @@ namespace RallyGame.Vehicles.Controllers
             float sum = 0f; int n = 0;
             foreach (var w in wheels) if (w.collider && w.driven) { sum += w.collider.rpm; n++; }
             return n == 0 ? 0f : sum / n;
+        }
+
+        /// Worst forward slip across the driven wheels. WheelCollider reports this in
+        /// its own units: near zero is rolling, larger means the patch is sliding.
+        /// Airborne wheels are skipped — GetGroundHit fails and they would otherwise
+        /// read as infinite slip and kill drive on every jump.
+        private float PeakDrivenForwardSlip()
+        {
+            float peak = 0f;
+            foreach (var w in wheels)
+            {
+                if (!w.collider || !w.driven) continue;
+                if (!w.collider.GetGroundHit(out var hit)) continue;
+                peak = Mathf.Max(peak, Mathf.Abs(hit.forwardSlip));
+            }
+            return peak;
         }
     }
 }

@@ -15,6 +15,12 @@ namespace RallyGame.Vehicles.Controllers
     /// Wear accumulates every 50 metres, which is far too often to log — that path is
     /// throttled hard and only reports at odometer milestones. Crashes are discrete
     /// and get a full breakdown.
+    ///
+    /// Crash DETECTION lives in CarImpactSensor, not here. This class only receives
+    /// an already-scored damage fraction and distributes it. That split exists because
+    /// the old inline path scored crashes from collision.impulse, which counts PhysX
+    /// depenetration work and so read a freshly spawned car sitting in the garage floor
+    /// as a 200%+ impact.
     [RequireComponent(typeof(CarController))]
     public class CarAssembly : MonoBehaviour
     {
@@ -31,19 +37,18 @@ namespace RallyGame.Vehicles.Controllers
         [SerializeField] private Renderer[] bodyRenderers;
         [SerializeField] private string damageProperty = "_DamageAmount";
 
-        [Header("Impact tuning")]
-        [Tooltip("Collision impulse below this is ignored (kerbs, scrapes).")]
-        [SerializeField] private float impactThreshold = 2500f;
-        [Tooltip("Condition removed per unit impulse above the threshold.")]
-        [SerializeField] private float damagePerImpulse = 0.00004f;
+        [Header("Impact")]
+        [Tooltip("A single-frame position jump larger than this is a teleport, not driving. " +
+                 "It is excluded from the odometer and re-arms the impact sensor. " +
+                 "Keep it well above one frame of travel at top speed.")]
+        [SerializeField] private float teleportDistanceMetres = 15f;
 
         [Header("Debug")]
         [Tooltip("Log an odometer line every this many km driven. 0 disables mileage logging.")]
         [SerializeField] private float odometerLogEveryKm = 1f;
-        [Tooltip("Log impacts that fall below the damage threshold too (kerbs, scrapes).")]
-        [SerializeField] private bool logIgnoredImpacts = false;
 
         private CarController controller;
+        private CarImpactSensor impactSensor;
         private MaterialPropertyBlock mpb;
         private OwnedCar car;
         private Vector3 lastPosition;
@@ -56,7 +61,13 @@ namespace RallyGame.Vehicles.Controllers
         private void Awake()
         {
             controller = GetComponent<CarController>();
+            impactSensor = GetComponent<CarImpactSensor>();
             mpb = new MaterialPropertyBlock();
+
+            if (impactSensor == null)
+                GameLog.Warn(LogCat.Vehicle,
+                    $"'{name}' has no CarImpactSensor — the car will take no crash damage at all. " +
+                    "Add the component to the car prefab root.", this);
         }
 
         /// Entry point used by the spawner when the player changes cars.
@@ -112,6 +123,18 @@ namespace RallyGame.Vehicles.Controllers
             lastPosition = transform.position;
             if (metres < 0.01f) return;
 
+            // A teleport shows up here as a huge single-frame delta. Charging it to the
+            // odometer would apply kilometres of wear in one frame, and the landing would
+            // register as a crash, so swallow both.
+            if (metres > teleportDistanceMetres)
+            {
+                GameLog.Verbose(LogCat.Vehicle,
+                    $"Ignoring {metres:0} m single-frame jump on '{name}' (teleport/respawn) — " +
+                    "no distance or wear accrued.", this);
+                impactSensor?.SuppressForTeleport();
+                return;
+            }
+
             kmAccumulator += metres / 1000f;
             if (kmAccumulator < 0.05f) return;   // batch: wear applies every 50 m
 
@@ -138,30 +161,35 @@ namespace RallyGame.Vehicles.Controllers
 
         // ---- impact damage -------------------------------------------------
 
-        private void OnCollisionEnter(Collision collision) => HandleImpact(collision.impulse.magnitude);
-
-        public void HandleImpact(float impulse)
+        /// Applies a crash the sensor has already validated and scored. This method
+        /// deliberately does no filtering and no severity maths — it clamps, distributes
+        /// and reports. The clamp is the hard guarantee that a single impact can never
+        /// remove more than 100% condition, which the old impulse path allowed.
+        public void ApplyImpact(float conditionLost, string context = null)
         {
             if (car == null) return;
 
-            if (impulse < impactThreshold)
-            {
-                if (logIgnoredImpacts)
-                    GameLog.Verbose(LogCat.Vehicle,
-                        $"Light contact ignored: impulse {impulse:0} below threshold {impactThreshold:0}", this);
-                return;
-            }
-
-            float total = (impulse - impactThreshold) * damagePerImpulse;
+            float total = Mathf.Clamp01(conditionLost);
+            if (total <= 0f) return;
 
             GameLog.Action(LogCat.Vehicle, "CRASH",
-                           $"'{name}' impulse {impulse:0} at {controller.SpeedKph:0} kph — " +
-                           $"{total:P1} total condition lost", this);
+                           $"'{name}' at {controller.SpeedKph:0} kph — {total:P1} total condition lost" +
+                           (string.IsNullOrEmpty(context) ? string.Empty : $" [{context}]"), this);
 
             DistributeDamage(total);
             onCrash?.Raise();
             onCarStateChanged?.Raise();
             Refresh();
+        }
+
+        /// Kept so any UnityEvent still wired to the old impulse signature keeps compiling.
+        /// Nothing in the project should call this — the sensor calls ApplyImpact directly.
+        [System.Obsolete("Impulse-based damage was removed. Use ApplyImpact(fraction) via CarImpactSensor.")]
+        public void HandleImpact(float impulse)
+        {
+            GameLog.Warn(LogCat.Vehicle,
+                $"HandleImpact({impulse:0}) called on '{name}'. This path is retired — " +
+                "re-wire the caller to CarImpactSensor. Ignoring.", this);
         }
 
         /// Bodywork absorbs first (GDD: never degrades over time, first to break on impact),

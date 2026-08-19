@@ -346,8 +346,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.18869412, y: 0.46942192, z: 0.9005594}
-  m_Center: {x: -0.43838316, y: 0.06374475, z: 0.23125172}
+  m_Size: {x: 0.18220437, y: 0.46942192, z: 0.9005594}
+  m_Center: {x: -0.4351383, y: 0.06374475, z: 0.23125172}
 --- !u!114 &738868017059424165
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1032,6 +1032,8 @@ GameObject:
   - component: {fileID: 5980517457964587922}
   - component: {fileID: 5832562187903467274}
   - component: {fileID: 3460521866515297128}
+  - component: {fileID: 5239346924681036921}
+  - component: {fileID: -6243030879523469303}
   m_Layer: 0
   m_Name: Car_Coupe1
   m_TagString: Untagged
@@ -1064,6 +1066,7 @@ Transform:
   - {fileID: 1278215768657210683}
   - {fileID: 3350061421467943311}
   - {fileID: 5134291308061396467}
+  - {fileID: 6784686906424617508}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &1097115781367896927
@@ -1156,6 +1159,10 @@ MonoBehaviour:
   steerSmoothing: 8
   engineBrakeTorque: 180
   antiRollForce: 4000
+  tractionControl: 0
+  maxForwardSlip: 0.35
+  tractionCutRate: 8
+  tractionRestoreRate: 2
   logGearChanges: 1
 --- !u!114 &5980517457964587922
 MonoBehaviour:
@@ -1176,10 +1183,8 @@ MonoBehaviour:
   onCrash: {fileID: 11400000, guid: 5796b36d885b1d2508e0a644f9e0ba04, type: 2}
   bodyRenderers: []
   damageProperty: _DamageAmount
-  impactThreshold: 2500
-  damagePerImpulse: 0.00004
+  teleportDistanceMetres: 15
   odometerLogEveryKm: 1
-  logIgnoredImpacts: 0
 --- !u!114 &5832562187903467274
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1221,6 +1226,48 @@ MonoBehaviour:
   targetPosition: 0.5
   wheelMass: 20
   radiusScale: 1
+--- !u!114 &5239346924681036921
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8059068872417526180}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b5f93b3fc96ff6fb8251544138208ec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Controllers.CarImpactSensor
+  impactThresholdKph: 15
+  severeCrashKph: 90
+  damageAtSevere: 0.35
+  severityExponent: 1.6
+  maxDamagePerImpact: 0.5
+  referenceMassKg: 1200
+  massInfluence: 0.5
+  spawnGraceSeconds: 1.5
+  teleportGraceSeconds: 1
+  reimpactCooldown: 0.25
+  ignoreLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  minOwnSpeedKph: 3
+  logRejectedContacts: 0
+--- !u!114 &-6243030879523469303
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8059068872417526180}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9382b0ef98de9eff3896690600dfbb87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Controllers.WheelDiagnostics
+  intervalSeconds: 1
+  onlyWhileMoving: 0
+  reportCollidersOnStart: 1
 --- !u!1 &8616923726716009983
 GameObject:
   m_ObjectHideFlags: 0
@@ -1256,6 +1303,78 @@ Transform:
   - {fileID: 4584658239697414041}
   m_Father: {fileID: 2779429909674517274}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &8854004704001873370
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6784686906424617508}
+  - component: {fileID: 5734481132597124700}
+  - component: {fileID: 2414410616809134554}
+  m_Layer: 0
+  m_Name: HoodInspectBox
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6784686906424617508
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8854004704001873370}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2779429909674517274}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &5734481132597124700
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8854004704001873370}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 0.19611019, z: 0.62496114}
+  m_Center: {x: 0, y: 0.071055084, z: 1.2524806}
+--- !u!114 &2414410616809134554
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8854004704001873370}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a257e42f88ef42b2a9275b09d1e5552, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Controllers.CarHoodInspectable
+  garage: {fileID: 11400000, guid: c3ba7d3374ea7e0e9a541163b7c9b1bc, type: 2}
+  inspectOnly: {fileID: 11400000, guid: 4888c583f9158dd50822b0c193e51a1d, type: 2}
+  isDriving: {fileID: 11400000, guid: eaa60d2cfba84d779b27ee249e88ffed, type: 2}
+  onOpenGarageUi: {fileID: 11400000, guid: d7ffd18878989a75599fa6c39499aad4, type: 2}
+  prompt: 'Open hood - [E]'
+  logManifestOnOpen: 1
 --- !u!1 &8883604702401562252
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using RallyGame.Core;
 using RallyGame.Input;
@@ -6,6 +7,12 @@ namespace RallyGame.Player
 {
     /// Raycast interaction. Publishes the current prompt through an SO channel so
     /// the HUD never has to find the player.
+    ///
+    /// The raycast walks ALL hits near-to-far rather than trusting the closest one.
+    /// A single Physics.Raycast returns whatever surface is nearest, which loses every
+    /// time an interaction box sits inside or behind a body mesh — the hood box on the
+    /// car being the obvious case. Taking the first hit that actually offers an
+    /// IInteractable fixes that without needing a dedicated layer per interactable.
     ///
     /// Logging contract: the raycast itself runs every frame and is NEVER logged.
     /// What gets logged is the transitions — a new target entering focus, focus
@@ -20,6 +27,9 @@ namespace RallyGame.Player
         [SerializeField] private BoolVariable inputLocked;
         [SerializeField] private float range = 3f;
         [SerializeField] private LayerMask mask = ~0;
+        [Tooltip("How many overlapping colliders the ray can see through. Raise only if a " +
+                 "target sits behind several layers of geometry.")]
+        [SerializeField] private int maxHits = 8;
 
         [Header("Debug")]
         [Tooltip("Log when the raycast target changes, even if it is not interactable.")]
@@ -29,11 +39,25 @@ namespace RallyGame.Player
 
         private IInteractable current;
 
+        private RaycastHit[] hitBuffer;
+
         // Transition tracking - the whole point is to only speak when something changes.
         private Object lastFocusObject;
         private string lastPrompt = string.Empty;
         private bool lastLocked;
         private bool lastCanInteract;
+
+        private void Awake() => hitBuffer = new RaycastHit[Mathf.Max(1, maxHits)];
+
+        /// The interactor is disabled wholesale when the player gets into the car, so the
+        /// last prompt would otherwise stay on the HUD for the whole drive. Clear on the
+        /// way out rather than relying on Update to run one more time.
+        private void OnDisable()
+        {
+            current = null;
+            ReportFocusLost("interactor disabled");
+            SetPrompt(null);
+        }
 
         private void Update()
         {
@@ -56,14 +80,33 @@ namespace RallyGame.Player
             current = null;
             var ray = new Ray(view.transform.position, view.transform.forward);
 
+            // RaycastNonAlloc does not sort, so do it once here and read near-to-far.
+            int count = Physics.RaycastNonAlloc(ray, hitBuffer, range, mask, QueryTriggerInteraction.Collide);
+            if (count > 1) System.Array.Sort(hitBuffer, 0, count, HitDistanceComparer.Instance);
+
             Object hitObject = null;
-            if (Physics.Raycast(ray, out var hit, range, mask, QueryTriggerInteraction.Collide))
+            float hitDistance = 0f;
+
+            for (int i = 0; i < count; i++)
             {
-                hitObject = hit.collider.gameObject;
-                current = hit.collider.GetComponentInParent<IInteractable>();
+                var candidate = hitBuffer[i].collider.GetComponentInParent<IInteractable>();
+                if (candidate == null) continue;
+
+                current = candidate;
+                hitObject = hitBuffer[i].collider.gameObject;
+                hitDistance = hitBuffer[i].distance;
+                break;
             }
 
-            ReportFocus(hitObject, hit.distance);
+            // Nothing interactable along the ray: fall back to the nearest surface so the
+            // focus log still says what the player is looking at.
+            if (hitObject == null && count > 0)
+            {
+                hitObject = hitBuffer[0].collider.gameObject;
+                hitDistance = hitBuffer[0].distance;
+            }
+
+            ReportFocus(hitObject, hitDistance);
 
             bool canInteract = current != null && current.CanInteract;
 
@@ -97,7 +140,7 @@ namespace RallyGame.Player
                 else
                 {
                     GameLog.Action(LogCat.Interact, $"INTERACT -> {Describe(current)}",
-                                   $"prompt was \"{current.Prompt}\", distance {hit.distance:0.00}m", ObjectOf(current));
+                                   $"prompt was \"{current.Prompt}\", distance {hitDistance:0.00}m", ObjectOf(current));
                     current.Interact(gameObject);
                 }
             }
@@ -137,9 +180,9 @@ namespace RallyGame.Player
 
             if (logPromptChanges && value != lastPrompt)
             {
-                if (value.Length == 0)      GameLog.Action(LogCat.Interact, "Prompt cleared", $"was \"{lastPrompt}\"", this);
+                if (value.Length == 0) GameLog.Action(LogCat.Interact, "Prompt cleared", $"was \"{lastPrompt}\"", this);
                 else if (lastPrompt.Length == 0) GameLog.Action(LogCat.Interact, "Prompt shown", $"\"{value}\"", this);
-                else                        GameLog.Change(LogCat.Interact, "Prompt", lastPrompt, value, this);
+                else GameLog.Change(LogCat.Interact, "Prompt", lastPrompt, value, this);
                 lastPrompt = value;
             }
 
@@ -156,5 +199,12 @@ namespace RallyGame.Player
         }
 
         private static Object ObjectOf(IInteractable i) => i as Component;
+
+        /// Allocated once, so the per-frame sort does not create garbage.
+        private class HitDistanceComparer : IComparer<RaycastHit>
+        {
+            public static readonly HitDistanceComparer Instance = new HitDistanceComparer();
+            public int Compare(RaycastHit a, RaycastHit b) => a.distance.CompareTo(b.distance);
+        }
     }
 }

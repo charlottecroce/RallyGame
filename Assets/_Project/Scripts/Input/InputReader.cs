@@ -18,6 +18,7 @@ namespace RallyGame.Input
     {
         public Vector2 Move { get; private set; }
         public Vector2 Look { get; private set; }
+        public int LastSampleFrame { get; private set; }
         public bool JumpPressed { get; private set; }
         public bool InteractPressed { get; private set; }
         public bool MenuPressed { get; private set; }
@@ -37,6 +38,7 @@ namespace RallyGame.Input
         /// Called once per frame by InputPump. Nothing else polls devices.
         public void Sample()
         {
+            LastSampleFrame = Time.frameCount;
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
             var mouse = Mouse.current;
