@@ -11,6 +11,10 @@ namespace RallyGame.Vehicles.Controllers
 {
     /// Binds save-layer data (OwnedCar) to a spawned car object. Owns everything the
     /// controller must not know: parts, wear, impact damage, visual body damage.
+    ///
+    /// Wear accumulates every 50 metres, which is far too often to log — that path is
+    /// throttled hard and only reports at odometer milestones. Crashes are discrete
+    /// and get a full breakdown.
     [RequireComponent(typeof(CarController))]
     public class CarAssembly : MonoBehaviour
     {
@@ -33,11 +37,18 @@ namespace RallyGame.Vehicles.Controllers
         [Tooltip("Condition removed per unit impulse above the threshold.")]
         [SerializeField] private float damagePerImpulse = 0.00004f;
 
+        [Header("Debug")]
+        [Tooltip("Log an odometer line every this many km driven. 0 disables mileage logging.")]
+        [SerializeField] private float odometerLogEveryKm = 1f;
+        [Tooltip("Log impacts that fall below the damage threshold too (kerbs, scrapes).")]
+        [SerializeField] private bool logIgnoredImpacts = false;
+
         private CarController controller;
         private MaterialPropertyBlock mpb;
         private OwnedCar car;
         private Vector3 lastPosition;
         private float kmAccumulator;
+        private float nextOdometerLog;
 
         public OwnedCar Car => car;
         public IVehicleController Vehicle => controller;
@@ -54,6 +65,22 @@ namespace RallyGame.Vehicles.Controllers
             car = owned;
             controller.ApplyDefinition(car.Definition(garage.Database));
             lastPosition = transform.position;
+            nextOdometerLog = car.odometerKm + odometerLogEveryKm;
+
+            GameLog.Action(LogCat.Vehicle, "Car bound to save data",
+                           $"'{name}' <- OwnedCar '{owned.instanceId}' ({owned.definitionId}) — " +
+                           $"{owned.installedPartInstanceIds.Count} part(s), {owned.odometerKm:0} km, " +
+                           $"tires {owned.tires.compound} at {1f - owned.tires.wear:P0}", this);
+
+            // Unresolvable parts are a common save-migration failure; name them.
+            foreach (var id in owned.installedPartInstanceIds)
+            {
+                var p = garage.GetOwnedPart(id);
+                if (p == null)
+                    GameLog.Warn(LogCat.Parts,
+                        $"Car '{owned.instanceId}' lists part instance '{id}' which is not in the garage inventory.", this);
+            }
+
             Refresh();
         }
 
@@ -97,6 +124,15 @@ namespace RallyGame.Vehicles.Controllers
             foreach (var id in car.installedPartInstanceIds)
                 garage.GetOwnedPart(id)?.AccumulateWear(km, garage.Database);
 
+            // This method fires every 50 m of driving, so it reports only at
+            // odometer milestones - roughly one line per kilometre, not per frame.
+            if (odometerLogEveryKm > 0f && car.odometerKm >= nextOdometerLog)
+            {
+                nextOdometerLog = car.odometerKm + odometerLogEveryKm;
+                GameLog.Verbose(LogCat.Vehicle,
+                    $"Odometer {car.odometerKm:0.0} km — tires {car.tires.compound} at {1f - car.tires.wear:P0} remaining", this);
+            }
+
             Refresh();
         }
 
@@ -106,9 +142,22 @@ namespace RallyGame.Vehicles.Controllers
 
         public void HandleImpact(float impulse)
         {
-            if (car == null || impulse < impactThreshold) return;
+            if (car == null) return;
+
+            if (impulse < impactThreshold)
+            {
+                if (logIgnoredImpacts)
+                    GameLog.Verbose(LogCat.Vehicle,
+                        $"Light contact ignored: impulse {impulse:0} below threshold {impactThreshold:0}", this);
+                return;
+            }
 
             float total = (impulse - impactThreshold) * damagePerImpulse;
+
+            GameLog.Action(LogCat.Vehicle, "CRASH",
+                           $"'{name}' impulse {impulse:0} at {controller.SpeedKph:0} kph — " +
+                           $"{total:P1} total condition lost", this);
+
             DistributeDamage(total);
             onCrash?.Raise();
             onCarStateChanged?.Raise();
@@ -125,8 +174,16 @@ namespace RallyGame.Vehicles.Controllers
             if (body != null)
             {
                 float absorbed = Mathf.Min(body.condition, amount * 0.6f);
+                float before = body.condition;
                 body.ApplyDamage(absorbed, DamageType.Impact);
                 spill = amount - absorbed;
+
+                GameLog.Verbose(LogCat.Parts,
+                    $"  bodywork absorbed {absorbed:P1}: {before:P0} -> {body.condition:P0}", this);
+            }
+            else
+            {
+                GameLog.Verbose(LogCat.Parts, "  no bodywork fitted — full impact passes to other parts", this);
             }
 
             if (spill <= 0f) return;
@@ -142,11 +199,26 @@ namespace RallyGame.Vehicles.Controllers
                 weightSum += d.impactWeight;
             }
 
-            if (weightSum <= 0f) return;
+            if (weightSum <= 0f)
+            {
+                GameLog.Verbose(LogCat.Parts, $"  {spill:P1} spillover discarded — no parts carry impact weight", this);
+                return;
+            }
+
+            GameLog.Verbose(LogCat.Parts,
+                $"  {spill:P1} spillover shared across {others.Count} part(s)", this);
+
             foreach (var p in others)
             {
                 var d = p.Definition(garage.Database);
-                p.ApplyDamage(spill * (d.impactWeight / weightSum), DamageType.Impact);
+                float share = spill * (d.impactWeight / weightSum);
+                float before = p.condition;
+                p.ApplyDamage(share, DamageType.Impact);
+
+                // Only call out parts that actually broke - the rest is noise.
+                if (before > 0.01f && p.condition <= 0.01f)
+                    GameLog.Warn(LogCat.Parts,
+                        $"Part DESTROYED by impact: '{d.displayName}' ({d.slot}) on car '{car.instanceId}'", this);
             }
         }
 

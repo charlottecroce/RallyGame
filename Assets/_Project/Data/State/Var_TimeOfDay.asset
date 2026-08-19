@@ -14,3 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Core.FloatVariable
   initialValue: 8
   changed: {fileID: 0}
+  logPolicy: 2
+  logCategory: 4

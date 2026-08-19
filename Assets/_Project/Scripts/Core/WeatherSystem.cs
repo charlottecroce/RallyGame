@@ -6,6 +6,9 @@ namespace RallyGame.Core
 
     /// Rolls weather at midnight. Grip multiplier is consumed by the tire model,
     /// so gameplay never reads this component directly.
+    ///
+    /// Weather changes once a day, which makes it cheap to log and very useful:
+    /// "why is the car suddenly sliding" is answered by one line.
     public class WeatherSystem : MonoBehaviour
     {
         [System.Serializable]
@@ -28,20 +31,41 @@ namespace RallyGame.Core
 
         public float GripMultiplier => Find(current.Value).gripMultiplier;
 
-        private void OnEnable() { if (onDayRolled) onDayRolled.Register(Roll); Apply(current.Value); }
+        private void OnEnable()
+        {
+            if (onDayRolled) onDayRolled.Register(Roll);
+            Apply(current.Value);
+            GameLog.Verbose(LogCat.World,
+                $"Weather system online: {profiles.Length} profile(s), starting on {current.Value}", this);
+        }
+
         private void OnDisable() { if (onDayRolled) onDayRolled.Unregister(Roll); }
 
         public void Roll()
         {
             float total = 0f;
             foreach (var p in profiles) total += p.weight;
+
+            if (total <= 0f)
+            {
+                GameLog.Warn(LogCat.World, "Weather roll skipped — every profile has zero weight.", this);
+                return;
+            }
+
+            var previous = current.Value;
             float pick = Random.value * total;
+
             foreach (var p in profiles)
             {
                 pick -= p.weight;
                 if (pick > 0f) continue;
+
                 current.Value = p.type;
                 Apply(p.type);
+
+                GameLog.Action(LogCat.World, "WEATHER ROLLED",
+                               $"{previous} -> {p.type}, grip multiplier {p.gripMultiplier:0.00}", this);
+
                 onWeatherChanged?.Raise();
                 return;
             }
@@ -54,13 +78,21 @@ namespace RallyGame.Core
             if (p.skybox) RenderSettings.skybox = p.skybox;
             RenderSettings.fogColor = p.fogColor;
             RenderSettings.fogDensity = p.fogDensity;
+
             foreach (var other in profiles)
                 if (other.rainVfx) other.rainVfx.SetActive(other.type == type);
+
+            GameLog.Verbose(LogCat.World,
+                $"Weather visuals applied: {type} (fog {p.fogDensity:0.0000}, grip {p.gripMultiplier:0.00})", this);
         }
 
         private WeatherProfile Find(WeatherType t)
         {
             foreach (var p in profiles) if (p.type == t) return p;
+
+            GameLog.Warn(LogCat.World,
+                $"No weather profile authored for {t} — falling back to the first entry.", this);
+
             return profiles.Length > 0 ? profiles[0] : new WeatherProfile();
         }
     }

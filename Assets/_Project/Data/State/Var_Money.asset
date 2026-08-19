@@ -13,4 +13,6 @@ MonoBehaviour:
   m_Name: Var_Money
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Core.FloatVariable
   initialValue: 1000
-  changed: {fileID: 11400000, guid: c6ce2840c243c4a7b83a494f0afb71bd, type: 2}
+  changed: {fileID: 0}
+  logPolicy: 0
+  logCategory: 4

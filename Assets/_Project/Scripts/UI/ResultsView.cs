@@ -31,7 +31,11 @@ namespace RallyGame.UI
         private void ShowStage()
         {
             var results = raceManager.DayResults;
-            if (results.Count == 0) return;
+            if (results.Count == 0)
+            {
+                GameLog.Warn(LogCat.UI, "Stage-finished raised but RaceManager.DayResults is empty — nothing to show.", this);
+                return;
+            }
             var r = results[results.Count - 1];
 
             var sb = new StringBuilder();
@@ -40,6 +44,9 @@ namespace RallyGame.UI
             if (r.penaltySeconds > 0f) sb.AppendLine($"Penalty   +{r.penaltySeconds:0}s ({r.missedCheckpoints} missed)");
             sb.AppendLine($"Total     {Format.LapTime(r.TotalSeconds)}");
             sb.AppendLine($"Position  {Format.Ordinal(r.placement)} / {r.fieldSize}");
+
+            GameLog.Action(LogCat.UI, "Results panel: stage summary",
+                           $"stage {results.Count}, {Format.LapTime(r.TotalSeconds)}, P{r.placement}/{r.fieldSize}", this);
             Show(sb.ToString());
         }
 
@@ -53,6 +60,9 @@ namespace RallyGame.UI
                 sb.AppendLine($"  {r.stageId}  {Format.LapTime(r.TotalSeconds)}  {Format.Ordinal(r.placement)}");
             }
             sb.AppendLine($"TOTAL {Format.LapTime(total)}");
+
+            GameLog.Action(LogCat.UI, "Results panel: event summary",
+                           $"{raceManager.DayResults.Count} stage(s), total {Format.LapTime(total)}", this);
             Show(sb.ToString());
         }
 
@@ -62,6 +72,13 @@ namespace RallyGame.UI
             if (body) body.text = text;
         }
 
-        public void Hide() { if (panel) panel.SetActive(false); }
+        public void Hide()
+        {
+            if (panel && panel.activeSelf)
+            {
+                GameLog.Action(LogCat.UI, "Results panel closed", null, this);
+                panel.SetActive(false);
+            }
+        }
     }
 }

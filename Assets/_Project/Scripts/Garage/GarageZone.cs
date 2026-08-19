@@ -11,8 +11,35 @@ namespace RallyGame.Garage
         [SerializeField] private BoolVariable playerInGarage;
         [SerializeField] private string playerTag = "Player";
 
+        [Header("Debug")]
+        [Tooltip("Also log non-player colliders that pass through. Useful when the tag is wrong.")]
+        [SerializeField] private bool logRejectedColliders = false;
+
         private void Reset() => GetComponent<Collider>().isTrigger = true;
-        private void OnTriggerEnter(Collider other) { if (other.CompareTag(playerTag)) playerInGarage.Value = true; }
-        private void OnTriggerExit(Collider other) { if (other.CompareTag(playerTag)) playerInGarage.Value = false; }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            if (other.CompareTag(playerTag))
+            {
+                GameLog.Action(LogCat.Garage, "ENTERED garage zone",
+                               $"zone '{name}', by '{other.name}'", this);
+                playerInGarage.Value = true;
+            }
+            else if (logRejectedColliders)
+            {
+                GameLog.Verbose(LogCat.World,
+                    $"'{other.name}' entered zone '{name}' but is tagged '{other.tag}', not '{playerTag}' — ignored.", this);
+            }
+        }
+
+        private void OnTriggerExit(Collider other)
+        {
+            if (other.CompareTag(playerTag))
+            {
+                GameLog.Action(LogCat.Garage, "LEFT garage zone",
+                               $"zone '{name}', by '{other.name}'", this);
+                playerInGarage.Value = false;
+            }
+        }
     }
 }

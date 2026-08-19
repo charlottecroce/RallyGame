@@ -1,4 +1,5 @@
 using UnityEngine;
+using RallyGame.Core;
 using RallyGame.Utilities;
 using RallyGame.Vehicles.Data;
 
@@ -6,6 +7,11 @@ namespace RallyGame.Vehicles.Controllers
 {
     /// WheelCollider-based arcade-sim controller. Knows nothing about parts, saves
     /// or races - it only consumes VehicleInput and ResolvedCarStats.
+    ///
+    /// LOGGING RULE FOR THIS FILE: FixedUpdate runs 50x/second and Update runs every
+    /// frame. Nothing inside them logs directly. Instead, gear/light/engine state is
+    /// compared against the last logged value and only reported when it CHANGES.
+    /// Throttle, brake, steer, RPM and wheel poses are never logged at all.
     [RequireComponent(typeof(Rigidbody))]
     public class CarController : MonoBehaviour, IVehicleController
     {
@@ -29,6 +35,10 @@ namespace RallyGame.Vehicles.Controllers
         [SerializeField] private float engineBrakeTorque = 180f;
         [SerializeField] private float antiRollForce = 4000f;
 
+        [Header("Debug")]
+        [Tooltip("Log every gear change. Turn off if automatic shifting makes this chatty.")]
+        [SerializeField] private bool logGearChanges = true;
+
         private Rigidbody rb;
         private CarDefinition def;
         private ResolvedCarStats stats;
@@ -40,6 +50,11 @@ namespace RallyGame.Vehicles.Controllers
         private float shiftTimer;
         private float currentSteer;
         private float rpm;
+
+        // Change-detection state so per-frame code can log without spamming.
+        private int lastLoggedGear = int.MinValue;
+        private bool lastLoggedLights;
+        private bool lightsLogPrimed;
 
         public Transform Root => transform;
         public float SpeedKph => rb ? rb.Velocity().magnitude * 3.6f : 0f;
@@ -54,6 +69,7 @@ namespace RallyGame.Vehicles.Controllers
             rb = GetComponent<Rigidbody>();
             def = fallbackDefinition;
             if (def) ApplyDefinition(def);
+            else GameLog.Verbose(LogCat.Vehicle, $"'{name}' has no fallback definition — waiting for CarAssembly.", this);
         }
 
         /// Called by CarAssembly once the OwnedCar is known.
@@ -63,6 +79,7 @@ namespace RallyGame.Vehicles.Controllers
             rb.mass = def.massKg;
             rb.centerOfMass = def.centerOfMassOffset;
 
+            int drivenCount = 0;
             foreach (var w in wheels)
             {
                 if (!w.collider) continue;
@@ -73,7 +90,13 @@ namespace RallyGame.Vehicles.Controllers
                     _ => true
                 };
                 w.driven = drive;
+                if (drive) drivenCount++;
             }
+
+            GameLog.Action(LogCat.Vehicle, "Definition applied",
+                           $"'{name}' = {def.displayName}: {def.massKg:0}kg, {def.drivetrain} " +
+                           $"({drivenCount} driven wheel(s)), redline {def.redlineRpm:0}, " +
+                           $"{def.gearRatios.Length} forward gear(s)", this);
         }
 
         public void ApplyStats(in ResolvedCarStats s)
@@ -82,24 +105,59 @@ namespace RallyGame.Vehicles.Controllers
             if (rb) rb.mass = Mathf.Max(200f, s.massKg);
             ApplyFriction();
             ApplyLights();
+
+            // Fires on fitment/wear/weather change - not per frame - so it can log.
+            GameLog.Verbose(LogCat.Vehicle,
+                $"Stats applied to '{name}': {stats.peakTorqueNm:0}Nm, {stats.massKg:0}kg, " +
+                $"grip fwd {stats.forwardGrip:0.00}/side {stats.sidewaysGrip:0.00}, " +
+                $"brakes {stats.brakeTorque:0}, canStart={stats.canStart}", this);
+
+            if (!stats.canStart)
+                GameLog.Warn(LogCat.Vehicle,
+                    $"'{name}' cannot start: a required part (engine or electronics) is missing or dead.", this);
         }
 
-        public void SetInput(in VehicleInput i) => input = i;
+        public void SetInput(in VehicleInput i) => input = i;   // per-frame, never logged
 
         public void SetControlEnabled(bool enabled)
         {
+            if (controlEnabled == enabled) return;
+
             controlEnabled = enabled;
             if (!enabled) input = default;
+
+            GameLog.Action(LogCat.Vehicle,
+                           enabled ? "Driver control ENABLED" : "Driver control DISABLED",
+                           $"'{name}' at {SpeedKph:0} kph", this);
         }
 
         public void SetEngineRunning(bool running)
         {
-            engineRunning = running && stats.canStart;
+            bool wanted = running;
+            bool result = running && stats.canStart;
+
+            if (engineRunning == result)
+            {
+                // Requested a start but the car refused - worth one line.
+                if (wanted && !result)
+                    GameLog.Refused(LogCat.Vehicle, $"start engine on '{name}'",
+                                    "resolved stats say canStart = false", this);
+                return;
+            }
+
+            engineRunning = result;
             if (!engineRunning) rpm = 0f;
+
+            GameLog.Action(LogCat.Vehicle, engineRunning ? "ENGINE STARTED" : "ENGINE STOPPED",
+                           $"'{name}', gear {GearName(gear)}, {SpeedKph:0} kph", this);
         }
 
         public void Teleport(Vector3 position, Quaternion rotation)
         {
+            GameLog.Action(LogCat.Vehicle, "Car teleported",
+                           $"'{name}' {transform.position:0.0} -> {position:0.0} " +
+                           $"(velocity zeroed, gear reset to 1)", this);
+
             rb.SetVelocity(Vector3.zero);
             rb.SetAngularVelocity(Vector3.zero);
             transform.SetPositionAndRotation(position, rotation);
@@ -113,6 +171,8 @@ namespace RallyGame.Vehicles.Controllers
             UpdateDrive();
             UpdateBrakes();
             AntiRoll();
+
+            ReportGearChange();   // change-detection only: silent unless the gear moved
         }
 
         private void Update() => UpdateWheelVisuals();
@@ -211,6 +271,16 @@ namespace RallyGame.Vehicles.Controllers
         {
             foreach (var l in headlights) if (l) { l.enabled = input.lights; l.range = Mathf.Max(30f, 30f + stats.lightRange); }
             foreach (var l in rallyLights) if (l) { l.enabled = input.lights && stats.lightRange > 0f; l.range = 40f + stats.lightRange; }
+
+            // Edge-triggered: only when the switch actually flips.
+            if (!lightsLogPrimed || input.lights != lastLoggedLights)
+            {
+                lightsLogPrimed = true;
+                lastLoggedLights = input.lights;
+                GameLog.Action(LogCat.Vehicle, input.lights ? "Lights ON" : "Lights OFF",
+                               $"'{name}': {headlights.Length} headlight(s), {rallyLights.Length} rally light(s), " +
+                               $"bonus range {stats.lightRange:0}", this);
+            }
         }
 
         /// Cheap anti-roll bar: keeps the car from tripping over itself on jumps.
@@ -244,6 +314,23 @@ namespace RallyGame.Vehicles.Controllers
                 w.visual.SetPositionAndRotation(pos, rot);
             }
         }
+
+        // ---- debug ---------------------------------------------------------
+
+        /// Called from FixedUpdate but only speaks when the gear actually moved.
+        private void ReportGearChange()
+        {
+            if (!logGearChanges || gear == lastLoggedGear) return;
+
+            string from = GearName(lastLoggedGear);
+            lastLoggedGear = gear;
+
+            GameLog.Action(LogCat.Vehicle, "Gear change",
+                           $"'{name}' {from} -> {GearName(gear)} at {SpeedKph:0} kph, {rpm:0} rpm", this);
+        }
+
+        private static string GearName(int g)
+            => g == int.MinValue ? "-" : g == 0 ? "R" : g.ToString();
 
         // ---- helpers -------------------------------------------------------
 

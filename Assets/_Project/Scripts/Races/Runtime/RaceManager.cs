@@ -9,6 +9,9 @@ namespace RallyGame.Races.Runtime
 {
     /// Sequences an event's stages inside the one persistent world scene: toggles race
     /// mode, teleports the car to each start, runs service windows, pays out.
+    ///
+    /// Every phase transition is logged. The per-frame countdown tick and stage timer
+    /// are not - only the moment they cross a boundary.
     public class RaceManager : MonoBehaviour
     {
         [Header("References")]
@@ -60,9 +63,36 @@ namespace RallyGame.Races.Runtime
         /// Called by the entry-tent board when the player signs on.
         public bool StartEvent(RaceEvent evt)
         {
-            if (raceState.inRace || evt == null || evt.completed) return false;
-            if (!evt.IsOpenNow(clock)) return false;
-            if (economy.Payouts.entryFee > 0 && !economy.TrySpend(economy.Payouts.entryFee)) return false;
+            // Each guard reports its own reason: "nothing happened when I signed on"
+            // is otherwise impossible to diagnose from the outside.
+            if (raceState.inRace)
+            {
+                GameLog.Refused(LogCat.Race, "start event", $"already racing '{raceState.activeEventId}'", this);
+                return false;
+            }
+            if (evt == null)
+            {
+                GameLog.Refused(LogCat.Race, "start event", "event was null", this);
+                return false;
+            }
+            if (evt.completed)
+            {
+                GameLog.Refused(LogCat.Race, $"start '{evt.eventId}'", "already completed this week", this);
+                return false;
+            }
+            if (!evt.IsOpenNow(clock))
+            {
+                GameLog.Refused(LogCat.Race, $"start '{evt.eventId}'",
+                                $"window closed — event runs {evt.day} {evt.startHour:0}h-{evt.endHour:0}h, " +
+                                $"now is {clock.Weekday} {clock.TimeOfDay:0.0}h", this);
+                return false;
+            }
+            if (economy.Payouts.entryFee > 0 && !economy.TrySpend(economy.Payouts.entryFee))
+            {
+                GameLog.Refused(LogCat.Race, $"start '{evt.eventId}'",
+                                $"entry fee {economy.Payouts.entryFee:N0} unaffordable", this);
+                return false;
+            }
 
             activeEvent = evt;
             dayResults.Clear();
@@ -71,6 +101,12 @@ namespace RallyGame.Races.Runtime
             raceState.activeEventId = evt.eventId;
             raceState.stageIndex = 0;
             raceState.stageCount = evt.stageIds.Count;
+
+            GameLog.Action(LogCat.Race, "RACE EVENT STARTED",
+                           $"'{evt.eventId}' ({evt.kind}) at {evt.locationId} — " +
+                           $"{evt.stageIds.Count} stage(s), field {evt.fieldSize}, purse {evt.purse:N0}, " +
+                           $"entry fee {economy.Payouts.entryFee:N0}", this);
+
             SetOpenWorldActive(false);
             if (clockPaused) clockPaused.Value = true;    // time stops for the duration (GDD)
 
@@ -82,7 +118,13 @@ namespace RallyGame.Races.Runtime
         private void BeginStage(int index)
         {
             var stage = database.GetStage(activeEvent.stageIds[index]);
-            if (stage == null) { EndEvent(); return; }
+            if (stage == null)
+            {
+                GameLog.Error(LogCat.Race,
+                    $"Stage id '{activeEvent.stageIds[index]}' is not in the DefinitionDatabase — ending event early.", this);
+                EndEvent();
+                return;
+            }
 
             raceState.stageIndex = index;
             raceState.activeStageId = stage.id;
@@ -94,10 +136,18 @@ namespace RallyGame.Races.Runtime
             carSpawner.Current?.Vehicle.Teleport(route[0].position, Quaternion.Euler(route[0].eulerAngles));
             carSpawner.Current?.Vehicle.SetControlEnabled(false);
 
+            if (carSpawner.Current == null)
+                GameLog.Warn(LogCat.Race, "Stage starting but there is no car in the world to place on the start line.", this);
+
             stageRunner.Begin(stage);
             raceState.totalCheckpoints = stageRunner.TotalCheckpoints;
             raceState.nextCheckpoint = 1;
             raceState.Notify();
+
+            GameLog.Action(LogCat.Race, $"Stage {index + 1} of {activeEvent.stageIds.Count} loaded",
+                           $"'{stage.id}', {raceState.totalCheckpoints} gate(s), " +
+                           $"car on start line, {countdownSeconds:0.#}s countdown", this);
+
             onStageStarted?.Raise();
         }
 
@@ -115,22 +165,30 @@ namespace RallyGame.Races.Runtime
                         carSpawner.Current?.Vehicle.SetControlEnabled(true);
                         carSpawner.Current?.Vehicle.SetEngineRunning(true);
                         raceState.Notify();
+
+                        // Fires exactly once per stage, so it is safe to log here.
+                        GameLog.Action(LogCat.Race, "GO — stage running", $"'{raceState.activeStageId}'", this);
                     }
                     break;
 
                 case RacePhase.Running:
-                    raceState.stageTime = stageRunner.Timer;
+                    raceState.stageTime = stageRunner.Timer;   // per-frame, never logged
                     break;
 
                 case RacePhase.ServiceWindow:
                     raceState.serviceSecondsRemaining -= Time.deltaTime;
-                    if (raceState.serviceSecondsRemaining <= 0f) BeginStage(raceState.stageIndex + 1);
+                    if (raceState.serviceSecondsRemaining <= 0f)
+                    {
+                        GameLog.Action(LogCat.Race, "Service window over", "starting next stage", this);
+                        BeginStage(raceState.stageIndex + 1);
+                    }
                     break;
             }
         }
 
         private void HandleCheckpoint(int passed, int total)
         {
+            // StageRunner already logs each gate; this only mirrors it into RaceState.
             raceState.nextCheckpoint = passed + 1;
             raceState.Notify();
         }
@@ -147,6 +205,11 @@ namespace RallyGame.Races.Runtime
             dayResults.Add(result);
             raceState.phase = RacePhase.Finished;
             raceState.Notify();
+
+            GameLog.Action(LogCat.Race, "Stage scored",
+                           $"'{result.stageId}' {result.TotalSeconds:0.00}s -> " +
+                           $"P{result.placement} of {result.fieldSize}{(result.didNotFinish ? " (DNF)" : "")}", this);
+
             onStageFinished?.Raise();
 
             bool moreStages = raceState.stageIndex + 1 < activeEvent.stageIds.Count;
@@ -161,12 +224,25 @@ namespace RallyGame.Races.Runtime
             raceState.serviceSecondsRemaining = serviceWindowSeconds;
             carSpawner.Current?.Vehicle.SetControlEnabled(true);
             raceState.Notify();
+
+            GameLog.Action(LogCat.Race, "Service window OPEN",
+                           $"{serviceWindowSeconds:0}s until stage {raceState.stageIndex + 2}, " +
+                           "driver control returned, service park reachable", this);
         }
 
         /// Skip the rest of the service window once the player is ready.
         public void ReadyForNextStage()
         {
-            if (raceState.phase == RacePhase.ServiceWindow) raceState.serviceSecondsRemaining = 0f;
+            if (raceState.phase == RacePhase.ServiceWindow)
+            {
+                GameLog.Action(LogCat.Race, "Service window skipped by player",
+                               $"{raceState.serviceSecondsRemaining:0.#}s forfeited", this);
+                raceState.serviceSecondsRemaining = 0f;
+            }
+            else
+            {
+                GameLog.Refused(LogCat.Race, "skip service window", $"current phase is {raceState.phase}", this);
+            }
         }
 
         private void EndEvent()
@@ -181,12 +257,19 @@ namespace RallyGame.Races.Runtime
             economy.Credit(payout);
             activeEvent.completed = true;
 
+            GameLog.Action(LogCat.Race, "EVENT COMPLETE",
+                           $"'{activeEvent.eventId}' — average placement {placement} of {activeEvent.fieldSize} " +
+                           $"across {dayResults.Count} stage(s), payout {payout:N0} from purse {activeEvent.purse:N0}", this);
+
             raceState.inRace = false;
             raceState.phase = RacePhase.None;
             SetOpenWorldActive(true);
 
             if (clockPaused) clockPaused.Value = false;
             clock.Advance(hoursPerRaceDay);      // dropped off a few hours later (GDD)
+
+            GameLog.Action(LogCat.Race, "Returned to open world",
+                           $"clock advanced {hoursPerRaceDay:0.#}h", this);
 
             raceState.Notify();
             onRaceFinished?.Raise();
@@ -195,12 +278,22 @@ namespace RallyGame.Races.Runtime
         /// Retire from the stage: scored as a DNF, no payout for that stage.
         public void Retire()
         {
-            if (!raceState.inRace) return;
+            if (!raceState.inRace)
+            {
+                GameLog.Refused(LogCat.Race, "retire", "not currently in a race", this);
+                return;
+            }
+
+            GameLog.Action(LogCat.Race, "RETIRED from stage",
+                           $"'{raceState.activeStageId}' at {raceState.stageTime:0.0}s — scored as DNF", this);
             stageRunner.Finish(true);
         }
 
         private void SetOpenWorldActive(bool active)
         {
+            GameLog.Verbose(LogCat.Race,
+                $"Open-world objects {(active ? "re-enabled" : "disabled")}: {openWorldOnly.Length} object(s)", this);
+
             foreach (var go in openWorldOnly) if (go) go.SetActive(active);
         }
 

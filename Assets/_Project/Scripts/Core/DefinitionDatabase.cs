@@ -9,6 +9,10 @@ namespace RallyGame.Core
     /// String-ID -> definition asset lookup. Save files store IDs only (SO references
     /// do not survive JSON), so every load path resolves through here.
     /// Asset rather than scene singleton: consistent with the rest of the SO architecture.
+    ///
+    /// Failed lookups already shouted; now they go through GameLog so they carry the
+    /// same timestamp and can be filtered with everything else. GetStage and
+    /// GetLocation used to fail silently — they no longer do.
     [CreateAssetMenu(menuName = "Rally/Definition Database", fileName = "DefinitionDatabase")]
     public class DefinitionDatabase : ScriptableObject
     {
@@ -40,6 +44,10 @@ namespace RallyGame.Core
             foreach (var c in allCars) if (c && !string.IsNullOrEmpty(c.id)) carsById[c.id] = c;
             foreach (var s in allStages) if (s && !string.IsNullOrEmpty(s.id)) stagesById[s.id] = s;
             foreach (var l in allLocations) if (l && !string.IsNullOrEmpty(l.id)) locationsById[l.id] = l;
+
+            GameLog.Verbose(LogCat.Core,
+                $"Definitions indexed: {partsById.Count} part(s), {carsById.Count} car(s), " +
+                $"{stagesById.Count} stage(s), {locationsById.Count} location(s)", this);
         }
 
         private void EnsureBuilt() { if (partsById == null) Build(); }
@@ -48,7 +56,7 @@ namespace RallyGame.Core
         {
             EnsureBuilt();
             if (id != null && partsById.TryGetValue(id, out var p)) return p;
-            Debug.LogError($"[Definitions] Unknown part id '{id}'");
+            GameLog.Error(LogCat.Core, $"Unknown part id '{id}' — is it in the database's Parts list?", this);
             return null;
         }
 
@@ -56,20 +64,24 @@ namespace RallyGame.Core
         {
             EnsureBuilt();
             if (id != null && carsById.TryGetValue(id, out var c)) return c;
-            Debug.LogError($"[Definitions] Unknown car id '{id}'");
+            GameLog.Error(LogCat.Core, $"Unknown car id '{id}' — is it in the database's Cars list?", this);
             return null;
         }
 
         public StageDefinition GetStage(string id)
         {
             EnsureBuilt();
-            return id != null && stagesById.TryGetValue(id, out var s) ? s : null;
+            if (id != null && stagesById.TryGetValue(id, out var s)) return s;
+            GameLog.Warn(LogCat.Core, $"Unknown stage id '{id}' — is it in the database's Stages list?", this);
+            return null;
         }
 
         public LocationDefinition GetLocation(string id)
         {
             EnsureBuilt();
-            return id != null && locationsById.TryGetValue(id, out var l) ? l : null;
+            if (id != null && locationsById.TryGetValue(id, out var l)) return l;
+            GameLog.Warn(LogCat.Core, $"Unknown location id '{id}' — is it in the database's Locations list?", this);
+            return null;
         }
 
 #if UNITY_EDITOR
@@ -83,6 +95,10 @@ namespace RallyGame.Core
             allLocations = LoadAll<LocationDefinition>();
             Build();
             UnityEditor.EditorUtility.SetDirty(this);
+
+            GameLog.Info(LogCat.Core,
+                $"Rescan complete: {allParts.Count} part(s), {allCars.Count} car(s), " +
+                $"{allStages.Count} stage(s), {allLocations.Count} location(s)", this);
         }
 
         private static List<T> LoadAll<T>() where T : ScriptableObject

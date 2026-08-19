@@ -1,9 +1,13 @@
 using UnityEngine;
+using RallyGame.Core;
 
 namespace RallyGame.Races.Runtime
 {
     /// Spawned by StageRunner from StageDefinition nodes. No authored scene objects,
     /// so stages can be re-baked without touching the level.
+    ///
+    /// The rejection branch is logged: "gates stopped registering" after a prefab or
+    /// layer change is otherwise completely invisible.
     [RequireComponent(typeof(BoxCollider))]
     public class Checkpoint : MonoBehaviour
     {
@@ -31,7 +35,14 @@ namespace RallyGame.Races.Runtime
         private void OnTriggerEnter(Collider other)
         {
             // Car root carries the Rigidbody; child colliders resolve up to it.
-            if (other.attachedRigidbody == null) return;
+            if (other.attachedRigidbody == null)
+            {
+                GameLog.Verbose(LogCat.Stage,
+                    $"Gate {Index}: '{other.name}' passed through but has no attached Rigidbody — ignored. " +
+                    "Only the car (whose root has the Rigidbody) can trigger gates.", this);
+                return;
+            }
+
             onPassed?.Invoke(Index);
         }
     }

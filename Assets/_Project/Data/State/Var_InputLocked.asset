@@ -14,3 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp:RallyGame.Core:BoolVariable
   initialValue: 0
   changed: {fileID: 0}
+  logPolicy: 0
+  logCategory: 4

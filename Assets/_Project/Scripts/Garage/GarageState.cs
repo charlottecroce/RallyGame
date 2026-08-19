@@ -9,6 +9,10 @@ namespace RallyGame.Garage
 {
     /// Owns every OwnedCar and OwnedPart the player has. Runtime state on an asset,
     /// so UI/dealers/race code reference it directly and the save layer has one place to read.
+    ///
+    /// Every mutation is a player-visible event (bought, sold, fitted, scrapped), so
+    /// all of them log. Lookups do not - they run from UI rebuilds and stat resolves
+    /// many times a frame.
     [CreateAssetMenu(menuName = "Rally/State/Garage State", fileName = "GarageState")]
     public class GarageState : ScriptableObject, IPartResolver
     {
@@ -28,6 +32,7 @@ namespace RallyGame.Garage
         private void OnEnable() { ownedCars = new List<OwnedCar>(); allParts = new List<OwnedPart>(); activeCarInstanceId = null; }
 
         // ---- lookups -------------------------------------------------------
+        // Deliberately silent: called constantly by UI and the stats resolver.
 
         public OwnedPart GetOwnedPart(string instanceId)
         {
@@ -75,16 +80,44 @@ namespace RallyGame.Garage
         {
             var part = new OwnedPart(def, condition);
             allParts.Add(part);
+
+            GameLog.Action(LogCat.Parts, "Part acquired",
+                           $"'{def.displayName}' ({def.id}, slot {def.slot}) at {condition:P0} condition — " +
+                           $"instance '{part.instanceId}', {allParts.Count} part(s) owned", this);
+
             onGarageChanged?.Raise();
             return part;
         }
 
-        public void AddPart(OwnedPart part) { allParts.Add(part); onGarageChanged?.Raise(); }
+        public void AddPart(OwnedPart part)
+        {
+            allParts.Add(part);
+
+            var def = part.Definition(database);
+            GameLog.Action(LogCat.Parts, "Part added to inventory",
+                           $"'{def?.displayName ?? part.definitionId}' at {part.condition:P0} — " +
+                           $"{allParts.Count} part(s) owned", this);
+
+            onGarageChanged?.Raise();
+        }
 
         public void RemovePart(OwnedPart part)
         {
-            foreach (var c in ownedCars) c.installedPartInstanceIds.Remove(part.instanceId);
+            var def = part.Definition(database);
+
+            // Report whether it was fitted, because unfitting is a side effect people miss.
+            foreach (var c in ownedCars)
+            {
+                if (c.installedPartInstanceIds.Remove(part.instanceId))
+                    GameLog.Action(LogCat.Parts, "Part force-removed from car",
+                                   $"'{def?.displayName}' was fitted to '{c.instanceId}'", this);
+            }
+
             allParts.Remove(part);
+            GameLog.Action(LogCat.Parts, "Part destroyed/sold",
+                           $"'{def?.displayName ?? part.definitionId}' instance '{part.instanceId}' — " +
+                           $"{allParts.Count} part(s) remaining", this);
+
             onGarageChanged?.Raise();
         }
 
@@ -93,13 +126,23 @@ namespace RallyGame.Garage
             var car = new OwnedCar(def);
             ownedCars.Add(car);
 
+            GameLog.Action(LogCat.Garage, "CAR ADDED to garage",
+                           $"'{def.displayName}' ({def.id}) — instance '{car.instanceId}', " +
+                           $"{ownedCars.Count} car(s) owned", this);
+
             if (withDefaultParts)
+            {
+                int fitted = 0;
                 foreach (var partDef in def.defaultParts)
                 {
                     if (!partDef) continue;
                     var part = AddPart(partDef);
                     car.installedPartInstanceIds.Add(part.instanceId);
+                    fitted++;
                 }
+                GameLog.Action(LogCat.Parts, "Default parts fitted",
+                               $"{fitted} part(s) onto '{car.instanceId}'", this);
+            }
 
             if (string.IsNullOrEmpty(activeCarInstanceId)) SetActiveCar(car.instanceId);
             onGarageChanged?.Raise();
@@ -108,20 +151,32 @@ namespace RallyGame.Garage
 
         public void RemoveCar(OwnedCar car)
         {
+            int scrapped = 0;
             foreach (var partId in new List<string>(car.installedPartInstanceIds))
             {
                 var part = GetOwnedPart(partId);
-                if (part != null) allParts.Remove(part);
+                if (part != null) { allParts.Remove(part); scrapped++; }
             }
+
             ownedCars.Remove(car);
+
+            GameLog.Action(LogCat.Garage, "CAR REMOVED from garage",
+                           $"'{car.instanceId}' ({car.definitionId}) with {scrapped} fitted part(s) — " +
+                           $"{ownedCars.Count} car(s) remaining", this);
+
             if (activeCarInstanceId == car.instanceId)
                 SetActiveCar(ownedCars.Count > 0 ? ownedCars[0].instanceId : null);
+
             onGarageChanged?.Raise();
         }
 
         public void SetActiveCar(string instanceId)
         {
             if (activeCarInstanceId == instanceId) return;
+
+            GameLog.Change(LogCat.Garage, "Active car",
+                           activeCarInstanceId ?? "<none>", instanceId ?? "<none>", this);
+
             activeCarInstanceId = instanceId;
             onActiveCarChanged?.Raise();
             onGarageChanged?.Raise();
@@ -129,6 +184,9 @@ namespace RallyGame.Garage
 
         public void Clear()
         {
+            GameLog.Action(LogCat.Garage, "Garage cleared",
+                           $"{ownedCars.Count} car(s) and {allParts.Count} part(s) discarded", this);
+
             ownedCars.Clear(); allParts.Clear(); activeCarInstanceId = null;
             onGarageChanged?.Raise();
         }
