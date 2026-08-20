@@ -58,8 +58,30 @@ namespace RallyGame.World.Roads
                  "never sinks the road.")]
         [Range(0, 12)][SerializeField] private int smoothingPasses = 4;
         [Range(0f, 1f)][SerializeField] private float smoothingStrength = 0.5f;
-        [Tooltip("How much the road banks with the hillside. 1 = follow the cross-slope exactly.")]
+        [Tooltip("How much the road banks with the hillside. 1 = follow the cross-slope exactly, " +
+                 "0 = never bank. Has no effect unless Max Camber Degrees below is greater than 0.")]
         [Range(0f, 1f)][SerializeField] private float bankBlend = 1f;
+
+        [Header("Camber & Skirt")]
+        [Tooltip("Hard ceiling on how far the road rolls to follow a cross-slope, in degrees. Past " +
+                 "this the road stops tilting and stands proud of the downhill side — that's exactly " +
+                 "when the skirt below has to do the most work. 0 disables banking entirely.")]
+        [Range(0f, 45f)][SerializeField] private float maxCamberDegrees = 12f;
+        [Tooltip("How far under the terrain the skirt's ground-contact vertex is buried, so a sliver " +
+                 "of mesh never peeks out on the far side of a bump.")]
+        [SerializeField] private float skirtBurial = 0.15f;
+        [Tooltip("Vertical wall height before the skirt stops digging straight down and battens " +
+                 "outward instead. Keeps a steep hillside from turning into a towering wall rather " +
+                 "than a proper embankment.")]
+        [SerializeField] private float skirtMaxDrop = 2f;
+        [Tooltip("Horizontal metres the skirt ramps outward for every extra metre it still needs to " +
+                 "drop once Skirt Max Drop is hit — like ballast under a rail bed. Bigger = a gentler, " +
+                 "wider batter. 0 falls back to a plain capped wall, which CAN leave a gap on a steep " +
+                 "camber — leave this above 0 unless you have a reason not to.")]
+        [SerializeField] private float skirtBatterSlope = 1.5f;
+        [Tooltip("Skirt material's texture repeats across its own width (wall + ramp), independent " +
+                 "of how the road surface tiles along its length.")]
+        [SerializeField] private float skirtUvTilesAcross = 0.5f;
 
         [Header("Junctions")]
         [Tooltip("Two strands whose centrelines come this close (metres, horizontal) are meeting.")]
@@ -137,6 +159,7 @@ namespace RallyGame.World.Roads
         [SerializeField] private Bounds bakedBounds;
 
         private const string MeshPrefix = "RoadMesh_";
+        private const string SkirtPrefix = "RoadSkirt_";
         private const string PropPrefix = "RoadProps_";
 
         public RoadSurface Surface => surface;
@@ -182,8 +205,8 @@ namespace RallyGame.World.Roads
 
                 if (i == 0) centreline.AddRange(samples);   // strand 0 is the one queries use
 
-                var meshes = RoadMeshBuilder.Build(samples, container.Splines[i].Closed, settings, $"{name}_S{i}");
-                foreach (var mesh in meshes) CreateChunk(mesh, chunks++);
+                var meshChunks = RoadMeshBuilder.Build(samples, container.Splines[i].Closed, settings, $"{name}_S{i}");
+                foreach (var meshChunk in meshChunks) CreateChunk(meshChunk, chunks++);
             }
 
             junctions.AddRange(RoadJunctions.Find(strands, JunctionSettings()));
@@ -294,7 +317,18 @@ namespace RallyGame.World.Roads
             probeMidRings = probeMidRings,
             smoothingPasses = smoothingPasses,
             smoothingStrength = smoothingStrength,
-            bankBlend = bankBlend
+            bankBlend = bankBlend,
+            // These four were previously never copied across, which silently zeroed
+            // them out (C# struct default): camber was permanently clamped to 0
+            // regardless of Bank Blend, and the skirt's adaptive drop collapsed to a
+            // flat constant equal to Shoulder Drop no matter how far the real ground
+            // was — that mismatch is what left gaps under the road on anything but a
+            // dead-flat cross-slope.
+            maxCamberDegrees = maxCamberDegrees,
+            skirtBurial = skirtBurial,
+            skirtMaxDrop = skirtMaxDrop,
+            skirtBatterSlope = skirtBatterSlope,
+            skirtUvTilesAcross = skirtUvTilesAcross
         };
 
         private RoadJunctionSettings JunctionSettings() => new RoadJunctionSettings
@@ -586,7 +620,12 @@ namespace RallyGame.World.Roads
 
         // ---- children ------------------------------------------------------
 
-        private GameObject CreateChunk(Mesh mesh, int index)
+        /// Builds the road chunk GameObject and, if this chunk has one, its skirt
+        /// child — the embankment mesh that runs down and outward from the shoulder
+        /// to the real ground. Parented under the road chunk (not a sibling of it),
+        /// so it is literally "under the road" in the hierarchy as well as in space,
+        /// and gets cleared automatically whenever the road chunk does.
+        private GameObject CreateChunk(in RoadMeshChunk chunk, int index)
         {
             var go = new GameObject($"{MeshPrefix}{index:00}");
             go.transform.SetParent(transform, false);
@@ -594,8 +633,33 @@ namespace RallyGame.World.Roads
             go.transform.localScale = Vector3.one;
             go.isStatic = true;
 
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshFilter>().sharedMesh = chunk.Road;
             go.AddComponent<MeshRenderer>().sharedMaterial = surface.material;
+            go.AddComponent<RoadSurfaceTag>().SetSurface(surface);
+
+            if (generateCollider)
+            {
+                var col = go.AddComponent<MeshCollider>();
+                col.sharedMesh = chunk.Road;
+                if (surface.physicsMaterial) col.sharedMaterial = surface.physicsMaterial;
+            }
+
+            if (chunk.Skirt != null) CreateSkirtChild(go.transform, chunk.Skirt, index);
+
+            return go;
+        }
+
+        private void CreateSkirtChild(Transform parent, Mesh mesh, int index)
+        {
+            var go = new GameObject($"{SkirtPrefix}{index:00}");
+            go.transform.SetParent(parent, false);
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.transform.localScale = Vector3.one;
+            go.isStatic = true;
+
+            var mat = surface.skirtMaterial ? surface.skirtMaterial : surface.material;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = mat;
             go.AddComponent<RoadSurfaceTag>().SetSurface(surface);
 
             if (generateCollider)
@@ -604,8 +668,6 @@ namespace RallyGame.World.Roads
                 col.sharedMesh = mesh;
                 if (surface.physicsMaterial) col.sharedMaterial = surface.physicsMaterial;
             }
-
-            return go;
         }
 
         private void ClearMeshes() => ClearChildren(MeshPrefix);
@@ -624,7 +686,9 @@ namespace RallyGame.World.Roads
 
         // Chunk meshes are built in world space and parented at identity, so renderer
         // bounds and mesh bounds agree. Props are skipped — a tall sign would otherwise
-        // inflate the bounds that nearest-road queries reject against.
+        // inflate the bounds that nearest-road queries reject against. Skirt renderers
+        // are picked up automatically here since GetComponentsInChildren recurses into
+        // each RoadMesh_* chunk, where the skirt now lives.
         private Bounds WorldBounds()
         {
             bool any = false;
@@ -649,7 +713,9 @@ namespace RallyGame.World.Roads
         // ---- editor --------------------------------------------------------
 #if UNITY_EDITOR
         /// Generated meshes must become real assets, or they vanish on the next domain
-        /// reload and every road turns invisible. Same reasoning as StageBaker.
+        /// reload and every road turns invisible. Same reasoning as StageBaker. Skirt
+        /// meshes are included here too — they live on child objects named RoadSkirt_*
+        /// under each RoadMesh_* chunk, and would otherwise never get saved.
         private void SaveMeshAssets()
         {
             const string root = "Assets/_Project/Generated";
@@ -662,7 +728,8 @@ namespace RallyGame.World.Roads
 
             foreach (var filter in GetComponentsInChildren<MeshFilter>())
             {
-                if (!filter.name.StartsWith(MeshPrefix)) continue;   // never re-asset a prop's mesh
+                bool isRoadMesh = filter.name.StartsWith(MeshPrefix) || filter.name.StartsWith(SkirtPrefix);
+                if (!isRoadMesh) continue;   // never re-asset a prop's mesh
 
                 var mesh = filter.sharedMesh;
                 if (mesh == null || UnityEditor.AssetDatabase.Contains(mesh)) continue;

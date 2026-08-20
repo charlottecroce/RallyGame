@@ -27,6 +27,13 @@ namespace RallyGame.World.Roads
         [Tooltip("Texture repeats per metre along the road. 0.1 = one tile every 10 m.")]
         public float uvTilesPerMetre = 0.12f;
 
+        [Header("Skirt")]
+        [Tooltip("Material for the embankment skirt that fills the gap under the road on a camber " +
+                 "or a side slope — the wall and ramp that run down to the actual ground. Leave " +
+                 "empty to reuse the road material above; the skirt is still built either way, so " +
+                 "there is never a hole under the road even without a dedicated texture.")]
+        public Material skirtMaterial;
+
         [Header("Grip")]
         [Tooltip("Multiplier on resolved car grip in the dry. Tarmac is the 1.0 reference.")]
         [Range(0.2f, 1.5f)] public float dryGrip = 1f;
@@ -38,7 +45,8 @@ namespace RallyGame.World.Roads
         public float defaultWidth = 7f;
         [Tooltip("Skirt on each side that drops to the terrain and hides the floating edge.")]
         public float shoulderWidth = 0.6f;
-        [Tooltip("How far the skirt drops below the road surface.")]
+        [Tooltip("How far the skirt drops below the road surface. This is also the floor for the " +
+                 "adaptive ground-following drop — the skirt never goes shallower than this, only deeper.")]
         public float shoulderDrop = 0.12f;
         [Tooltip("Height above the terrain the road sits. Just enough to beat z-fighting.")]
         public float heightOffset = 0.06f;

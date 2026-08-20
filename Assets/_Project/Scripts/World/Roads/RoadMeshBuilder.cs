@@ -14,8 +14,17 @@ namespace RallyGame.World.Roads
         public Vector3 forward;
         public Vector3 up;
         public float distance;     // metres from the start of the spline
-        public float skirtLeft;    // metres the left shoulder edge drops, in world Y
-        public float skirtRight;
+
+        // ---- skirt profile, per side ----
+        // The skirt drops from the shoulder edge in up to two segments: a near-
+        // vertical "wall" up to skirtMaxDrop, then — if that alone doesn't reach the
+        // ground — a "ramp" that spreads outward instead of continuing straight down.
+        public float skirtLeft;         // wall drop, left (capped at skirtMaxDrop)
+        public float skirtRight;        // wall drop, right
+        public float skirtSpreadLeft;   // extra horizontal run of the ramp, left (0 = no ramp needed)
+        public float skirtSpreadRight;  // extra horizontal run of the ramp, right
+        public float skirtFarDropLeft;  // TOTAL drop from the shoulder edge to the ramp's outer vertex, left
+        public float skirtFarDropRight; // TOTAL drop from the shoulder edge to the ramp's outer vertex, right
     }
 
     /// Everything the builder needs, in one struct so callers pass a value, not
@@ -43,8 +52,21 @@ namespace RallyGame.World.Roads
 
         // ---- camber ----
         public float maxCamberDegrees;  // hard ceiling on how far the road rolls
-        public float skirtBurial;       // how far under the terrain the skirt edge sinks
-        public float skirtMaxDrop;      // safety cap on the skirt wall height
+
+        // ---- skirt ----
+        public float skirtBurial;        // how far under the terrain the skirt's ground vertex sinks
+        public float skirtMaxDrop;       // vertical wall height before the skirt battens outward instead of digging deeper
+        public float skirtBatterSlope;   // horizontal run per extra metre of drop once skirtMaxDrop is hit. 0 = old capped-wall behaviour (can leave a gap)
+        public float skirtUvTilesAcross; // skirt material's texture repeats across its own width (wall + ramp)
+    }
+
+    /// One mesh chunk: the road surface, and — when the road has a shoulder — the
+    /// embankment skirt that runs under and beside it. Skirt is null when there's no
+    /// shoulder to skirt (shoulderWidth <= 0), so callers can check for that directly.
+    public struct RoadMeshChunk
+    {
+        public Mesh Road;
+        public Mesh Skirt;
     }
 
     /// Pure functions: spline in, samples and meshes out. No MonoBehaviour, no scene
@@ -203,7 +225,7 @@ namespace RallyGame.World.Roads
                 if (passes > 0 && k > 0f) SmoothUp(up, rings, closed);
             }
 
-            // ---- pass 3: orthonormal frames, arc length, and how far the skirts reach ----
+            // ---- pass 3: orthonormal frames, arc length, and the skirt profile ----
             Vector3 previous = Vector3.zero;
             float travelled = 0f;
             float outer = s.width * 0.5f + s.shoulderWidth;
@@ -222,10 +244,13 @@ namespace RallyGame.World.Roads
                 previous = pos[i];
 
                 float dropL = s.shoulderDrop, dropR = s.shoulderDrop;
+                float spreadL = 0f, spreadR = 0f;
+                float farDropL = s.shoulderDrop, farDropR = s.shoulderDrop;
+
                 if (s.conformToGround && s.shoulderWidth > 0.001f)
                 {
-                    dropL = SkirtDrop(pos[i] - right * outer, s);
-                    dropR = SkirtDrop(pos[i] + right * outer, s);
+                    SkirtProfile(pos[i] - right * outer, -right, s, out dropL, out spreadL, out farDropL);
+                    SkirtProfile(pos[i] + right * outer, right, s, out dropR, out spreadR, out farDropR);
                 }
 
                 samples.Add(new RoadSample
@@ -235,7 +260,11 @@ namespace RallyGame.World.Roads
                     up = u,
                     distance = travelled,
                     skirtLeft = dropL,
-                    skirtRight = dropR
+                    skirtRight = dropR,
+                    skirtSpreadLeft = spreadL,
+                    skirtSpreadRight = spreadR,
+                    skirtFarDropLeft = farDropL,
+                    skirtFarDropRight = farDropR
                 });
             }
 
@@ -323,16 +352,54 @@ namespace RallyGame.World.Roads
             return true;
         }
 
-        /// How far the shoulder edge has to fall to meet the ground beneath it. On flat
-        /// terrain this is just the authored drop; on a clamped camber the downhill
-        /// side can be metres up in the air, and this is the wall that closes the gap.
-        private static float SkirtDrop(Vector3 edge, in RoadBuildSettings s)
+        /// How far the shoulder edge has to fall to meet the ground beneath it, split
+        /// into a near-vertical wall (up to skirtMaxDrop) and, if that alone isn't
+        /// enough, a batter that spreads outward at skirtBatterSlope run-per-drop until
+        /// it actually finds ground. This is the fix for the road-floats-on-a-camber
+        /// bug: the old version simply clamped the wall's height and stopped, which on
+        /// a clamped or partial camber left the wall short of the terrain — a visible
+        /// gap. Here the outer vertex always ends up at the real ground height (minus
+        /// burial); only its shape (tall wall vs. wide ramp) changes.
+        private static void SkirtProfile(Vector3 edge, Vector3 outward, in RoadBuildSettings s,
+                                         out float wallDrop, out float spread, out float farDrop)
         {
-            if (!Ground(edge, s, out Vector3 hit)) return s.shoulderDrop;
+            wallDrop = s.shoulderDrop;
+            spread = 0f;
+            farDrop = s.shoulderDrop;
 
-            float drop = edge.y - (hit.y - Mathf.Max(0f, s.skirtBurial));
+            if (!Ground(edge, s, out Vector3 hit)) return;   // no ground found: leave the authored default
+
+            float needed = Mathf.Max(s.shoulderDrop, edge.y - (hit.y - Mathf.Max(0f, s.skirtBurial)));
             float cap = Mathf.Max(s.shoulderDrop, s.skirtMaxDrop);
-            return Mathf.Clamp(drop, s.shoulderDrop, cap);
+
+            if (needed <= cap)
+            {
+                wallDrop = needed;
+                farDrop = needed;
+                return;
+            }
+
+            // Past the cap, stop digging straight down and batten outward instead —
+            // a shallow ramp reaches the same ground without a cliff-height wall.
+            wallDrop = cap;
+
+            float run = (needed - cap) * Mathf.Max(0f, s.skirtBatterSlope);
+            if (run < 0.01f) { farDrop = needed; return; }   // batter disabled: dig straight down, same as before
+
+            Vector3 far = edge + outward * run;
+            if (Ground(far, s, out Vector3 farHit))
+            {
+                farDrop = edge.y - (farHit.y - Mathf.Max(0f, s.skirtBurial));
+                spread = run;
+            }
+            else
+            {
+                // Ground vanished past the ramp (a cliff edge, a hole) — stop where we
+                // last had solid footing rather than reaching for nothing.
+                farDrop = cap;
+            }
+
+            farDrop = Mathf.Max(farDrop, wallDrop);   // the ramp never climbs back above the wall
         }
 
         private static bool Ground(Vector3 at, in RoadBuildSettings s, out Vector3 point)
@@ -373,19 +440,22 @@ namespace RallyGame.World.Roads
 
         // ---- mesh ----------------------------------------------------------
 
-        /// Ribbon-extrude the samples into one or more meshes.
+        /// Ribbon-extrude the samples into one or more mesh chunks. Each chunk is the
+        /// road surface plus — when the road has a shoulder — a separate skirt mesh
+        /// for the embankment underneath it, so the two can carry different materials
+        /// (tarmac on top, gravel/dirt on the skirt) and the skirt can be parented
+        /// visibly "under" the road in the hierarchy.
         ///
         /// Chunking is not an optimisation afterthought — a 5 km road at 2 m spacing is
         /// 2500 rings, and one mesh that size culls as a single unit and blows past the
         /// 16-bit index limit. Consecutive chunks share their boundary ring, so there
         /// is no seam.
-        public static List<Mesh> Build(List<RoadSample> samples, bool closed, in RoadBuildSettings s, string name)
+        public static List<RoadMeshChunk> Build(List<RoadSample> samples, bool closed, in RoadBuildSettings s, string name)
         {
-            var meshes = new List<Mesh>();
-            if (samples == null || samples.Count < 2) return meshes;
+            var chunks = new List<RoadMeshChunk>();
+            if (samples == null || samples.Count < 2) return chunks;
 
             bool skirt = s.shoulderWidth > 0.001f;
-            int perRing = skirt ? 4 : 2;
             int ringsPerChunk = Mathf.Max(2, s.maxRingsPerChunk);
 
             int total = closed ? samples.Count + 1 : samples.Count;   // closed loops repeat ring 0
@@ -394,23 +464,31 @@ namespace RallyGame.World.Roads
             for (int start = 0; start < total - 1; start += ringsPerChunk - 1)
             {
                 int end = Mathf.Min(start + ringsPerChunk - 1, total - 1);
-                meshes.Add(BuildChunk(samples, start, end, perRing, skirt, s, $"{name}_Chunk{chunk:00}"));
+                string chunkName = $"{name}_Chunk{chunk:00}";
+
+                var road = BuildRoadMesh(samples, start, end, s, chunkName);
+                var skirtMesh = skirt ? BuildSkirtMesh(samples, start, end, s, chunkName + "_Skirt") : null;
+
+                chunks.Add(new RoadMeshChunk { Road = road, Skirt = skirtMesh });
                 chunk++;
             }
 
-            return meshes;
+            return chunks;
         }
 
-        private static Mesh BuildChunk(List<RoadSample> samples, int start, int end,
-                                       int perRing, bool skirt, in RoadBuildSettings s, string name)
+        /// The drivable surface only — two verts per ring, unchanged shape whether or
+        /// not the road has a shoulder. The skirt (if any) is a separate mesh built by
+        /// BuildSkirtMesh below.
+        private static Mesh BuildRoadMesh(List<RoadSample> samples, int start, int end,
+                                          in RoadBuildSettings s, string name)
         {
             int ringCount = end - start + 1;
-            int vertCount = ringCount * perRing;
+            int vertCount = ringCount * 2;
 
             var verts = new Vector3[vertCount];
             var normals = new Vector3[vertCount];
             var uvs = new Vector2[vertCount];
-            var tris = new int[(ringCount - 1) * (perRing - 1) * 6];
+            var tris = new int[(ringCount - 1) * 6];
 
             float half = s.width * 0.5f;
             int ti = 0;
@@ -420,58 +498,128 @@ namespace RallyGame.World.Roads
                 var sample = samples[(start + r) % samples.Count];
                 Vector3 right = Vector3.Cross(sample.up, sample.forward).normalized;
                 float v = sample.distance * s.uvTilesPerMetre;
-                int b = r * perRing;
+                int b = r * 2;
 
-                if (skirt)
-                {
-                    // The skirt drops straight down rather than along the ring's up, so
-                    // it reaches the ground by the shortest route and the wall stays
-                    // vertical however hard the road is cambered.
-                    Vector3 leftEdge = sample.position - right * (half + s.shoulderWidth);
-                    Vector3 rightEdge = sample.position + right * (half + s.shoulderWidth);
-
-                    verts[b + 0] = leftEdge - Vector3.up * sample.skirtLeft;
-                    verts[b + 1] = sample.position - right * half;
-                    verts[b + 2] = sample.position + right * half;
-                    verts[b + 3] = rightEdge - Vector3.up * sample.skirtRight;
-
-                    uvs[b + 0] = new Vector2(0f, v);
-                    uvs[b + 1] = new Vector2(0f, v);
-                    uvs[b + 2] = new Vector2(1f, v);
-                    uvs[b + 3] = new Vector2(1f, v);
-
-                    // Skirt verts get a normal leaning outwards, so a tall fill wall is
-                    // shaded as a bank rather than as more road surface.
-                    normals[b + 0] = Vector3.Slerp(sample.up, -right, Wall(sample.skirtLeft, s));
-                    normals[b + 1] = sample.up;
-                    normals[b + 2] = sample.up;
-                    normals[b + 3] = Vector3.Slerp(sample.up, right, Wall(sample.skirtRight, s));
-                }
-                else
-                {
-                    verts[b + 0] = sample.position - right * half;
-                    verts[b + 1] = sample.position + right * half;
-                    uvs[b + 0] = new Vector2(0f, v);
-                    uvs[b + 1] = new Vector2(1f, v);
-                    normals[b + 0] = sample.up;
-                    normals[b + 1] = sample.up;
-                }
+                verts[b + 0] = sample.position - right * half;
+                verts[b + 1] = sample.position + right * half;
+                uvs[b + 0] = new Vector2(0f, v);
+                uvs[b + 1] = new Vector2(1f, v);
+                normals[b + 0] = sample.up;
+                normals[b + 1] = sample.up;
 
                 if (r == 0) continue;
 
-                // Winding: columns run along +right, rows along +forward, so
-                // (a, c, b) / (b, c, d) faces up. Same pattern as a terrain grid.
-                int prev = (r - 1) * perRing;
-                for (int k = 0; k < perRing - 1; k++)
-                {
-                    int a = prev + k, bb = prev + k + 1, c = b + k, d = b + k + 1;
-                    tris[ti++] = a; tris[ti++] = c; tris[ti++] = bb;
-                    tris[ti++] = bb; tris[ti++] = c; tris[ti++] = d;
-                }
+                int prev = (r - 1) * 2;
+                AddQuad(tris, ref ti, prev + 0, prev + 1, b + 0, b + 1);
             }
 
+            return FinishMesh(verts, normals, uvs, tris, name);
+        }
+
+        /// The embankment mesh: for each side, a wall segment (shoulder edge down to
+        /// skirtMaxDrop) and a ramp segment (spreading outward the rest of the way to
+        /// the ground). The two columns nearest the road (index 2 and 3) sit at exactly
+        /// the road mesh's own edge positions, so the two meshes share an edge with no
+        /// seam — but the quad BETWEEN them is deliberately skipped, since that patch
+        /// of ground is already covered by the road surface sitting directly above it.
+        private static Mesh BuildSkirtMesh(List<RoadSample> samples, int start, int end,
+                                           in RoadBuildSettings s, string name)
+        {
+            int ringCount = end - start + 1;
+            const int perRing = 6;   // far-left, bend-left, top-left, top-right, bend-right, far-right
+            int vertCount = ringCount * perRing;
+
+            var verts = new Vector3[vertCount];
+            var normals = new Vector3[vertCount];
+            var uvs = new Vector2[vertCount];
+            var tris = new int[(ringCount - 1) * 4 * 6];   // 4 quads per ring step (2-3 is skipped)
+
+            float half = s.width * 0.5f;
+            float outer = half + s.shoulderWidth;
+            float uScale = s.skirtUvTilesAcross;
+            int ti = 0;
+
+            for (int r = 0; r < ringCount; r++)
+            {
+                var sample = samples[(start + r) % samples.Count];
+                Vector3 right = Vector3.Cross(sample.up, sample.forward).normalized;
+                Vector3 up = sample.up;
+                float v = sample.distance * s.uvTilesPerMetre;
+                int b = r * perRing;
+
+                Vector3 roadLeft = sample.position - right * half;
+                Vector3 roadRight = sample.position + right * half;
+                Vector3 leftBend = sample.position - right * outer - up * sample.skirtLeft;
+                Vector3 rightBend = sample.position + right * outer - up * sample.skirtRight;
+                Vector3 leftFar = leftBend - right * sample.skirtSpreadLeft
+                                            - up * (sample.skirtFarDropLeft - sample.skirtLeft);
+                Vector3 rightFar = rightBend + right * sample.skirtSpreadRight
+                                              - up * (sample.skirtFarDropRight - sample.skirtRight);
+
+                verts[b + 0] = leftFar;
+                verts[b + 1] = leftBend;
+                verts[b + 2] = roadLeft;
+                verts[b + 3] = roadRight;
+                verts[b + 4] = rightBend;
+                verts[b + 5] = rightFar;
+
+                uvs[b + 0] = new Vector2(-(outer + sample.skirtSpreadLeft) * uScale, v);
+                uvs[b + 1] = new Vector2(-outer * uScale, v);
+                uvs[b + 2] = new Vector2(-half * uScale, v);
+                uvs[b + 3] = new Vector2(half * uScale, v);
+                uvs[b + 4] = new Vector2(outer * uScale, v);
+                uvs[b + 5] = new Vector2((outer + sample.skirtSpreadRight) * uScale, v);
+
+                Vector3 outwardL = -right;
+                Vector3 outwardR = right;
+                Vector3 nTopBendL = SegmentNormal(sample.skirtLeft, s.shoulderWidth, outwardL, up);
+                Vector3 nBendFarL = SegmentNormal(sample.skirtFarDropLeft - sample.skirtLeft, sample.skirtSpreadLeft, outwardL, up);
+                Vector3 nTopBendR = SegmentNormal(sample.skirtRight, s.shoulderWidth, outwardR, up);
+                Vector3 nBendFarR = SegmentNormal(sample.skirtFarDropRight - sample.skirtRight, sample.skirtSpreadRight, outwardR, up);
+
+                normals[b + 0] = nBendFarL;
+                normals[b + 1] = Vector3.Slerp(nTopBendL, nBendFarL, 0.5f).normalized;
+                normals[b + 2] = up;
+                normals[b + 3] = up;
+                normals[b + 4] = Vector3.Slerp(nTopBendR, nBendFarR, 0.5f).normalized;
+                normals[b + 5] = nBendFarR;
+
+                if (r == 0) continue;
+
+                int prev = (r - 1) * perRing;
+                AddQuad(tris, ref ti, prev + 0, prev + 1, b + 0, b + 1);   // left ramp
+                AddQuad(tris, ref ti, prev + 1, prev + 2, b + 1, b + 2);   // left wall
+                // (2, 3) skipped — the road mesh already covers that span from above.
+                AddQuad(tris, ref ti, prev + 3, prev + 4, b + 3, b + 4);   // right wall
+                AddQuad(tris, ref ti, prev + 4, prev + 5, b + 4, b + 5);   // right ramp
+            }
+
+            return FinishMesh(verts, normals, uvs, tris, name);
+        }
+
+        /// 0 for a shallow ramp (mostly facing up, like ground), approaching 1 for a
+        /// near-vertical wall (facing outward). Driven by the segment's own rise-over-
+        /// run rather than a fixed constant, so it looks right whether the segment ends
+        /// up as a tall cliff-face or a wide gravel batter.
+        private static Vector3 SegmentNormal(float verticalDrop, float horizontalRun, Vector3 outward, Vector3 up)
+        {
+            float lean = Mathf.Clamp01(verticalDrop / Mathf.Max(0.05f, horizontalRun + verticalDrop));
+            Vector3 dir = outward.sqrMagnitude > 1e-6f ? outward.normalized : up;
+            Vector3 n = Vector3.Slerp(up, dir, lean);
+            return n.sqrMagnitude > 1e-6f ? n.normalized : up;
+        }
+
+        private static void AddQuad(int[] tris, ref int ti, int a, int b, int c, int d)
+        {
+            // Winding: (a, c, b) / (b, c, d) faces up, matching a terrain grid.
+            tris[ti++] = a; tris[ti++] = c; tris[ti++] = b;
+            tris[ti++] = b; tris[ti++] = c; tris[ti++] = d;
+        }
+
+        private static Mesh FinishMesh(Vector3[] verts, Vector3[] normals, Vector2[] uvs, int[] tris, string name)
+        {
             var mesh = new Mesh { name = name };
-            mesh.indexFormat = vertCount > 65000
+            mesh.indexFormat = verts.Length > 65000
                 ? UnityEngine.Rendering.IndexFormat.UInt32
                 : UnityEngine.Rendering.IndexFormat.UInt16;
 
@@ -482,13 +630,6 @@ namespace RallyGame.World.Roads
             mesh.RecalculateTangents();
             mesh.RecalculateBounds();
             return mesh;
-        }
-
-        /// 0 for an ordinary shoulder, approaching 1 once the skirt is a real wall.
-        private static float Wall(float drop, in RoadBuildSettings s)
-        {
-            float span = Mathf.Max(0.01f, s.shoulderWidth);
-            return Mathf.Clamp01((drop - s.shoulderDrop) / (span * 2f));
         }
     }
 }
