@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using RallyGame.Core;
 using RallyGame.Garage;
 using RallyGame.Races.Runtime;
@@ -32,6 +33,15 @@ namespace RallyGame.UI
         [SerializeField] private TMP_Text serviceLabel;
         [SerializeField] private TMP_Text tireLabel;
 
+        [Header("Gearbox widgets")]
+        [Tooltip("Optional. Filled Image; set Image Type to Filled in the inspector.")]
+        [SerializeField] private Image rpmBar;
+        [Tooltip("Optional. Shows AT / MT so the player knows which mode G left them in.")]
+        [SerializeField] private TMP_Text transmissionLabel;
+        [SerializeField] private Color rpmNormal = new Color(0.85f, 0.85f, 0.85f);
+        [SerializeField] private Color rpmRedline = new Color(0.9f, 0.2f, 0.15f);
+        [Range(0.6f, 1f)] [SerializeField] private float shiftLightAt = 0.88f;
+
         private void Update()
         {
             if (clockLabel) clockLabel.text = $"{clock.Weekday} {Format.Clock24(clock.TimeOfDay)}  {weather.Value}";
@@ -41,8 +51,25 @@ namespace RallyGame.UI
             var car = spawner ? spawner.Current : null;
             if (car != null)
             {
-                if (speedLabel) speedLabel.text = $"{Mathf.RoundToInt(car.Vehicle.SpeedKph)} km/h";
-                if (gearLabel) gearLabel.text = car.Vehicle.Gear == 0 ? "R" : car.Vehicle.Gear.ToString();
+                var v = car.Vehicle;
+                if (speedLabel) speedLabel.text = $"{Mathf.RoundToInt(v.SpeedKph)} km/h";
+
+                // Gear indices: -1 = R, 0 = N, 1..N forward. One shared formatter.
+                if (gearLabel) gearLabel.text = Gearbox.Label(v.Gear);
+
+                if (rpmBar)
+                {
+                    float n = Mathf.Clamp01(v.NormalisedRpm);
+                    rpmBar.fillAmount = n;
+                    rpmBar.color = n >= shiftLightAt ? rpmRedline : rpmNormal;
+                }
+
+                if (transmissionLabel)
+                {
+                    var cc = car.GetComponent<CarController>();
+                    if (cc) transmissionLabel.text = cc.Transmission == TransmissionMode.Manual ? "MT" : "AT";
+                }
+
                 if (tireLabel && car.Car != null)
                     tireLabel.text = $"{car.Car.tires.compound}  {Format.Percent(1f - car.Car.tires.wear)}";
             }

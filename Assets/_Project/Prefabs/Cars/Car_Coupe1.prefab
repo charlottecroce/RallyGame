@@ -463,7 +463,7 @@ GameObject:
   - component: {fileID: 4365236853675619986}
   - component: {fileID: 3003808903476588176}
   m_Layer: 0
-  m_Name: Plane
+  m_Name: Body Mesh
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -477,13 +477,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4643931361861650156}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.7071068, y: 0, z: -0, w: 0.7071067}
-  m_LocalPosition: {x: -0, y: 0, z: 0}
+  m_LocalRotation: {x: -0.7071068, y: -0, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 100, y: 100, z: 100}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 2779429909674517274}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_Father: {fileID: 30400934966914466}
+  m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
 --- !u!33 &4365236853675619986
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -783,6 +783,39 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &6924377988035838831
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 30400934966914466}
+  m_Layer: 0
+  m_Name: Body
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &30400934966914466
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6924377988035838831}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6171451447960746356}
+  - {fileID: 3350061421467943311}
+  m_Father: {fileID: 2779429909674517274}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7042196093272645655
 GameObject:
   m_ObjectHideFlags: 0
@@ -865,6 +898,7 @@ GameObject:
   - component: {fileID: 3350061421467943311}
   - component: {fileID: 3697582630829729548}
   - component: {fileID: 2776357014155427480}
+  - component: {fileID: 9101020959848541094}
   m_Layer: 0
   m_Name: InteriorCamera
   m_TagString: Untagged
@@ -880,12 +914,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7231580910962795820}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.167, y: 0.272, z: 0.673}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.16700006, y: 0.27200007, z: 0.6730001}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 2779429909674517274}
+  m_Father: {fileID: 30400934966914466}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &3697582630829729548
 Camera:
@@ -982,6 +1016,30 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &9101020959848541094
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7231580910962795820}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5268e63fdaa6391b385ddb144b450377, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Visuals.CarCameraRig
+  car: {fileID: 4282512099422472276}
+  targetCamera: {fileID: 3697582630829729548}
+  baseFov: 62
+  maxFov: 78
+  throttleKick: 3.5
+  fovRate: 3.5
+  slipShake: 0.012
+  surfaceShake: 0.01
+  shakeFrequency: 22
+  impactPunch: 0.06
+  slideLookDegrees: 9
+  slideLookRate: 5
 --- !u!1 &8052557938297756425
 GameObject:
   m_ObjectHideFlags: 0
@@ -1037,6 +1095,7 @@ GameObject:
   - component: {fileID: 359436792341869634}
   - component: {fileID: 4914877490982036109}
   - component: {fileID: 8616489974109633626}
+  - component: {fileID: 4858381270609415712}
   m_Layer: 0
   m_Name: Car_Coupe1
   m_TagString: Untagged
@@ -1061,15 +1120,14 @@ Transform:
   - {fileID: 3191804279550217630}
   - {fileID: 3841081503476136284}
   - {fileID: 6970612715648565561}
-  - {fileID: 6171451447960746356}
   - {fileID: 5734154530445753446}
   - {fileID: 7524518077325911063}
   - {fileID: 4294607074250614868}
   - {fileID: 7151848385511619517}
   - {fileID: 1278215768657210683}
-  - {fileID: 3350061421467943311}
   - {fileID: 5134291308061396467}
   - {fileID: 6784686906424617508}
+  - {fileID: 30400934966914466}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &1097115781367896927
@@ -1160,12 +1218,22 @@ MonoBehaviour:
   rallyLights:
   - {fileID: 1860687410258714119}
   steerSmoothing: 8
-  engineBrakeTorque: 180
+  steerReturnMultiplier: 1.6
   antiRollForce: 4000
+  yawDamping: 0.15
+  transferAuthority: 0.6
+  measuredLoadBlend: 0.35
+  loadFilterRate: 18
+  gFilterRate: 12
+  dynamicCentreOfMass: 1
+  comShiftMetres: 0.09
   tractionControl: 0
   maxForwardSlip: 0.35
   tractionCutRate: 8
   tractionRestoreRate: 2
+  reverseEngageKph: 5
+  autoUpshiftPoint: 0.92
+  limiterCutSeconds: 0.06
   logGearChanges: 1
 --- !u!114 &5980517457964587922
 MonoBehaviour:
@@ -1325,6 +1393,30 @@ MonoBehaviour:
   nudgeCooldown: 0.6
   groundNormalAngle: 40
   onStuckBeyondRecovery: {fileID: 11400000, guid: 8d5952b3e960b8b76b253743a7c2c54f, type: 2}
+--- !u!114 &4858381270609415712
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8059068872417526180}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eec358988ad02d2dbaf23a9e2f2aca35, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Vehicles.Visuals.CarBodyRig
+  body: {fileID: 30400934966914466}
+  pitchDegreesPerG: 2.6
+  rollDegreesPerG: 3.4
+  suspensionShare: 0.45
+  suspensionPitchDegrees: 4
+  suspensionRollDegrees: 5
+  heaveMetres: 0.05
+  surgeMetres: 0.025
+  responseRate: 9
+  springiness: 0.18
+  maxPitchDegrees: 7
+  maxRollDegrees: 8
 --- !u!1 &8616923726716009983
 GameObject:
   m_ObjectHideFlags: 0
