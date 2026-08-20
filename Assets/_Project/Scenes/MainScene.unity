@@ -8329,6 +8329,7 @@ GameObject:
   - component: {fileID: 354557339}
   - component: {fileID: 354557340}
   - component: {fileID: 354557341}
+  - component: {fileID: 354557342}
   m_Layer: 0
   m_Name: --- SYSTEMS ---
   m_TagString: Untagged
@@ -8665,6 +8666,18 @@ MonoBehaviour:
   maxSafeTiltDegrees: 25
   blockDuringRace: 0
   cooldownSeconds: 1.5
+--- !u!114 &354557342
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 354557325}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c672d87c2f574aa48a877a6a4e767b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Streaming.WorldPersistent
 --- !u!4 &358153067 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 140f72700cb821933839640142ffff3c, type: 3}
@@ -10877,6 +10890,7 @@ GameObject:
   - component: {fileID: 447495955}
   - component: {fileID: 447495954}
   - component: {fileID: 447495953}
+  - component: {fileID: 447495956}
   m_Layer: 0
   m_Name: EventSystem
   m_TagString: Untagged
@@ -10945,6 +10959,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &447495956
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 447495952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c672d87c2f574aa48a877a6a4e767b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Streaming.WorldPersistent
 --- !u!4 &449646816 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 140f72700cb821933839640142ffff3c, type: 3}
@@ -21932,6 +21958,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 885312062}
+  - component: {fileID: 885312063}
   m_Layer: 0
   m_Name: CarSpawnPoint
   m_TagString: Untagged
@@ -21955,6 +21982,18 @@ Transform:
   - {fileID: 2574869374601060639}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: -5.971, z: 0}
+--- !u!114 &885312063
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 885312061}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c672d87c2f574aa48a877a6a4e767b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Streaming.WorldPersistent
 --- !u!1001 &889148878
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -29545,6 +29584,7 @@ GameObject:
   - component: {fileID: 1246154990}
   - component: {fileID: 1246154989}
   - component: {fileID: 1246154988}
+  - component: {fileID: 1246154991}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -29661,6 +29701,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!114 &1246154991
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1246154987}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c672d87c2f574aa48a877a6a4e767b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Streaming.WorldPersistent
 --- !u!1 &1246577835
 GameObject:
   m_ObjectHideFlags: 0
@@ -31079,6 +31131,7 @@ GameObject:
   - component: {fileID: 1337489466}
   - component: {fileID: 1337489465}
   - component: {fileID: 1337489464}
+  - component: {fileID: 1337489467}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -31171,6 +31224,18 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0.9, z: 0}
+--- !u!114 &1337489467
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1337489462}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c672d87c2f574aa48a877a6a4e767b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Streaming.WorldPersistent
 --- !u!4 &1337855829 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8098c8cfe036cac15907501ebd91840e, type: 3}
@@ -33299,6 +33364,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1421135305}
+  - component: {fileID: 1421135306}
   m_Layer: 0
   m_Name: Roads
   m_TagString: Untagged
@@ -33322,6 +33388,18 @@ Transform:
   - {fileID: 1989054640}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1421135306
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1421135304}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c672d87c2f574aa48a877a6a4e767b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Streaming.WorldPersistent
 --- !u!1 &1424655745
 GameObject:
   m_ObjectHideFlags: 0
@@ -57982,6 +58060,7 @@ GameObject:
   - component: {fileID: 2726177367074821110}
   - component: {fileID: 30690484854926379}
   - component: {fileID: 4952379598118325767}
+  - component: {fileID: 8996140865269776871}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -61852,6 +61931,18 @@ MonoBehaviour:
   entryRoot: {fileID: 8811410762455818163}
   entryPrefab: {fileID: 7214782569884523505, guid: 2ccdfd294197055bcb06fd51d1fc5f1c, type: 3}
   header: {fileID: 3084038239423989898}
+--- !u!114 &8996140865269776871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3083399712362040978}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c672d87c2f574aa48a877a6a4e767b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Streaming.WorldPersistent
 --- !u!1 &9025706021179338903
 GameObject:
   m_ObjectHideFlags: 0
