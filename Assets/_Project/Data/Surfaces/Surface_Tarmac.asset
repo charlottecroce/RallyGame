@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.World.Roads.RoadSurface
   id: tarmac
   displayName: Tarmac
-  material: {fileID: 0}
+  material: {fileID: 2100000, guid: b8a3f3675f97a7810baa2bf887187845, type: 2}
   uvTilesPerMetre: 0.12
   dryGrip: 1
   wetGrip: 0.85
-  defaultWidth: 8
+  defaultWidth: 10
   shoulderWidth: 0.6
   shoulderDrop: 0.12
   heightOffset: 0.06

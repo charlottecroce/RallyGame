@@ -5,7 +5,8 @@ using UnityEngine.Splines;
 
 namespace RallyGame.World.Roads
 {
-    /// One cross-section of road: where it sits, which way it runs, which way is up.
+    /// One cross-section of road: where it sits, which way it runs, which way is up,
+    /// and how far each shoulder has to reach down to meet the ground.
     [System.Serializable]
     public struct RoadSample
     {
@@ -13,6 +14,8 @@ namespace RallyGame.World.Roads
         public Vector3 forward;
         public Vector3 up;
         public float distance;     // metres from the start of the spline
+        public float skirtLeft;    // metres the left shoulder edge drops, in world Y
+        public float skirtRight;
     }
 
     /// Everything the builder needs, in one struct so callers pass a value, not
@@ -36,7 +39,12 @@ namespace RallyGame.World.Roads
         public bool probeMidRings;      // also probe halfway to the next ring
         public int smoothingPasses;     // vertical relaxation iterations
         public float smoothingStrength; // 0..1 blend toward the neighbour average
-        public float bankBlend;         // 0 = spline up, 1 = full terrain cross-slope
+        public float bankBlend;         // 0 = never bank, 1 = follow the cross-slope
+
+        // ---- camber ----
+        public float maxCamberDegrees;  // hard ceiling on how far the road rolls
+        public float skirtBurial;       // how far under the terrain the skirt edge sinks
+        public float skirtMaxDrop;      // safety cap on the skirt wall height
     }
 
     /// Pure functions: spline in, samples and meshes out. No MonoBehaviour, no scene
@@ -54,7 +62,7 @@ namespace RallyGame.World.Roads
 
         /// Walk the spline at a fixed spacing and fit each cross-section to the ground.
         ///
-        /// Three things are done here that a single centreline raycast cannot do, and
+        /// Four things are done here that a single centreline raycast cannot do, and
         /// between them they are what stops the road burying itself on hilly terrain
         /// WITHOUT raising heightOffset:
         ///
@@ -66,11 +74,16 @@ namespace RallyGame.World.Roads
         ///  2. A probe halfway between rings. The mesh between two cross-sections is a
         ///     flat chord, so a crest that falls between samples cuts straight through
         ///     it. That deficit is measured and the two ends are lifted by exactly the
-        ///     sag, which is what removes the "road disappears over the brow" artefact.
+        ///     sag, which removes the "road disappears over the brow" artefact.
         ///  3. A vertical relaxation pass. Following every terrain wrinkle is what
         ///     makes the surface feel bumpy to drive. Heights are smoothed toward their
         ///     neighbours, then clamped back up against the clearances from (1) and (2)
         ///     — smoothing can only ever give back height, never push the road under.
+        ///  4. A camber limit. Copying a steep hillside's cross-slope makes a road no
+        ///     one can drive, so the roll is clamped. Past the limit the road stops
+        ///     tilting and instead sits proud of the downhill side, and the shoulder
+        ///     skirt is extended downwards to reach the ground — a cut-and-fill shelf,
+        ///     which is what a real road does there.
         ///
         /// missedProbes reports how many cross-sections found no ground under the
         /// centreline — a non-zero count almost always means the terrain is not on the
@@ -190,9 +203,10 @@ namespace RallyGame.World.Roads
                 if (passes > 0 && k > 0f) SmoothUp(up, rings, closed);
             }
 
-            // ---- pass 3: orthonormal frames and arc length ----
+            // ---- pass 3: orthonormal frames, arc length, and how far the skirts reach ----
             Vector3 previous = Vector3.zero;
             float travelled = 0f;
+            float outer = s.width * 0.5f + s.shoulderWidth;
 
             for (int i = 0; i < rings; i++)
             {
@@ -207,7 +221,22 @@ namespace RallyGame.World.Roads
                 if (i > 0) travelled += Vector3.Distance(pos[i], previous);
                 previous = pos[i];
 
-                samples.Add(new RoadSample { position = pos[i], forward = f, up = u, distance = travelled });
+                float dropL = s.shoulderDrop, dropR = s.shoulderDrop;
+                if (s.conformToGround && s.shoulderWidth > 0.001f)
+                {
+                    dropL = SkirtDrop(pos[i] - right * outer, s);
+                    dropR = SkirtDrop(pos[i] + right * outer, s);
+                }
+
+                samples.Add(new RoadSample
+                {
+                    position = pos[i],
+                    forward = f,
+                    up = u,
+                    distance = travelled,
+                    skirtLeft = dropL,
+                    skirtRight = dropR
+                });
             }
 
             return samples;
@@ -249,18 +278,31 @@ namespace RallyGame.World.Roads
 
             if (!probeFound[mid]) return false;
 
-            // The line through the outermost hits is the ground the bar has to lie
-            // along. Without this the ring stays level across and one edge digs into a
-            // side slope however high the centre sits.
+            // The zero-camber reference: right held horizontal, so this frame is
+            // pitched with the road but not rolled at all.
+            Vector3 flatRight = Vector3.Cross(Vector3.up, fwd);
+            if (flatRight.sqrMagnitude < 1e-6f) flatRight = right;
+            flatRight.Normalize();
+            Vector3 flatUp = Vector3.Cross(fwd, flatRight).normalized;
+
+            // The line through the outermost hits is the ground the bar would lie along
+            // if it copied the hillside exactly. Measure that as a roll about the
+            // forward axis, scale it by the bank blend, then clamp it: past the limit
+            // the road stops leaning and starts standing proud of the downhill side.
+            float roll = 0f;
             if (hi > lo)
             {
                 Vector3 across = probePoint[hi] - probePoint[lo];
                 Vector3 terrainUp = Vector3.Cross(fwd, across);
                 if (terrainUp.y < 0f) terrainUp = -terrainUp;
+
                 if (terrainUp.sqrMagnitude > 1e-6f)
-                    up = Vector3.Slerp(splineUp.normalized, terrainUp.normalized,
-                                       Mathf.Clamp01(s.bankBlend)).normalized;
+                    roll = Vector3.SignedAngle(flatUp, terrainUp.normalized, fwd) * Mathf.Clamp01(s.bankBlend);
             }
+
+            float limit = Mathf.Max(0f, s.maxCamberDegrees);
+            roll = Mathf.Clamp(roll, -limit, limit);
+            up = (Quaternion.AngleAxis(roll, fwd) * flatUp).normalized;
 
             Vector3 fitRight = Vector3.Cross(up, fwd);
             if (fitRight.sqrMagnitude < 1e-6f) fitRight = right;
@@ -268,7 +310,8 @@ namespace RallyGame.World.Roads
 
             // Given that tilt, the road surface at lateral offset d sits at
             // centreY + fitRight.y * d, so solve each probe for the centre height it
-            // demands and keep the worst one.
+            // demands and keep the worst one. On a clamped cross-slope this is what
+            // lifts the whole ring until the uphill edge is clear.
             for (int i = 0; i < n; i++)
             {
                 if (!probeFound[i]) continue;
@@ -278,6 +321,18 @@ namespace RallyGame.World.Roads
 
             centreY = probePoint[mid].y + s.heightOffset;
             return true;
+        }
+
+        /// How far the shoulder edge has to fall to meet the ground beneath it. On flat
+        /// terrain this is just the authored drop; on a clamped camber the downhill
+        /// side can be metres up in the air, and this is the wall that closes the gap.
+        private static float SkirtDrop(Vector3 edge, in RoadBuildSettings s)
+        {
+            if (!Ground(edge, s, out Vector3 hit)) return s.shoulderDrop;
+
+            float drop = edge.y - (hit.y - Mathf.Max(0f, s.skirtBurial));
+            float cap = Mathf.Max(s.shoulderDrop, s.skirtMaxDrop);
+            return Mathf.Clamp(drop, s.shoulderDrop, cap);
         }
 
         private static bool Ground(Vector3 at, in RoadBuildSettings s, out Vector3 point)
@@ -369,17 +424,28 @@ namespace RallyGame.World.Roads
 
                 if (skirt)
                 {
-                    // Skirt verts sit outboard and lower so the road edge buries itself
-                    // in the terrain instead of hovering over it.
-                    verts[b + 0] = sample.position - right * (half + s.shoulderWidth) - sample.up * s.shoulderDrop;
+                    // The skirt drops straight down rather than along the ring's up, so
+                    // it reaches the ground by the shortest route and the wall stays
+                    // vertical however hard the road is cambered.
+                    Vector3 leftEdge = sample.position - right * (half + s.shoulderWidth);
+                    Vector3 rightEdge = sample.position + right * (half + s.shoulderWidth);
+
+                    verts[b + 0] = leftEdge - Vector3.up * sample.skirtLeft;
                     verts[b + 1] = sample.position - right * half;
                     verts[b + 2] = sample.position + right * half;
-                    verts[b + 3] = sample.position + right * (half + s.shoulderWidth) - sample.up * s.shoulderDrop;
+                    verts[b + 3] = rightEdge - Vector3.up * sample.skirtRight;
 
                     uvs[b + 0] = new Vector2(0f, v);
                     uvs[b + 1] = new Vector2(0f, v);
                     uvs[b + 2] = new Vector2(1f, v);
                     uvs[b + 3] = new Vector2(1f, v);
+
+                    // Skirt verts get a normal leaning outwards, so a tall fill wall is
+                    // shaded as a bank rather than as more road surface.
+                    normals[b + 0] = Vector3.Slerp(sample.up, -right, Wall(sample.skirtLeft, s));
+                    normals[b + 1] = sample.up;
+                    normals[b + 2] = sample.up;
+                    normals[b + 3] = Vector3.Slerp(sample.up, right, Wall(sample.skirtRight, s));
                 }
                 else
                 {
@@ -387,9 +453,9 @@ namespace RallyGame.World.Roads
                     verts[b + 1] = sample.position + right * half;
                     uvs[b + 0] = new Vector2(0f, v);
                     uvs[b + 1] = new Vector2(1f, v);
+                    normals[b + 0] = sample.up;
+                    normals[b + 1] = sample.up;
                 }
-
-                for (int k = 0; k < perRing; k++) normals[b + k] = sample.up;
 
                 if (r == 0) continue;
 
@@ -416,6 +482,13 @@ namespace RallyGame.World.Roads
             mesh.RecalculateTangents();
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        /// 0 for an ordinary shoulder, approaching 1 once the skirt is a real wall.
+        private static float Wall(float drop, in RoadBuildSettings s)
+        {
+            float span = Mathf.Max(0.01f, s.shoulderWidth);
+            return Mathf.Clamp01((drop - s.shoulderDrop) / (span * 2f));
         }
     }
 }

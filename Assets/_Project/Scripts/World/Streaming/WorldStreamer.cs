@@ -7,7 +7,8 @@ using RallyGame.Core;
 namespace RallyGame.World.Streaming
 {
     /// Keeps a square of terrain cells loaded around the player and throws the rest
-    /// away. Lives in the always-loaded scene.
+    /// away. Lives in the always-loaded scene, on whatever object holds your other
+    /// persistent systems.
     ///
     /// Two rules make this behave rather than thrash:
     ///   - Load radius is smaller than unload radius. A cell you just loaded is not
@@ -23,9 +24,13 @@ namespace RallyGame.World.Streaming
     {
         [Header("World")]
         [SerializeField] private WorldCells cells;
-        [Tooltip("Usually the car. Left empty, the tagged object is found at startup.")]
+        [Tooltip("What the streaming follows — usually the car. Leave empty to find it by tag.")]
         [SerializeField] private Transform target;
+        [Tooltip("Used when Target is empty. The object must actually carry this tag.")]
         [SerializeField] private string targetTag = "Player";
+        [Tooltip("Last resort if neither is found: follow the main camera. Keeps the world " +
+                 "streaming in menus and cinematics rather than freezing.")]
+        [SerializeField] private bool fallBackToCamera = true;
 
         [Header("Radius (in tiles)")]
         [Tooltip("Cells this close are kept loaded. 1 = a 3x3 block, 2 = 5x5.")]
@@ -52,16 +57,28 @@ namespace RallyGame.World.Streaming
 
         private int unloadsSinceSweep;
         private bool busy;
+        private float nextComplaint;
+        private Vector2Int lastCoord = new Vector2Int(int.MinValue, int.MinValue);
 
         /// True when the ring around the target is fully loaded and nothing is queued.
         public bool Settled => !busy && desired.Count > 0 && desired.Count == CountLoadedOfDesired();
         public int LoadedCount => loaded.Count;
+        public Transform Target => target;
 
         private void Start()
         {
             if (cells == null)
             {
                 GameLog.Error(LogCat.World, "World streamer has no WorldCells asset — nothing will stream.", this);
+                enabled = false;
+                return;
+            }
+
+            if (cells.Count == 0)
+            {
+                GameLog.Error(LogCat.World,
+                    "World streamer's WorldCells asset is empty. Re-run the World Splitter, or the " +
+                    "grid it needs was never filled in.", this);
                 enabled = false;
                 return;
             }
@@ -113,14 +130,43 @@ namespace RallyGame.World.Streaming
             }
         }
 
+        /// Explicit target, then tag, then camera. Complains out loud when it finds
+        /// nothing — a streamer with no target looks exactly like a broken streamer:
+        /// the cells that happened to be open stay open and nothing else ever loads.
         private bool Resolve()
         {
             if (target) return true;
-            if (string.IsNullOrEmpty(targetTag)) return false;
 
-            var found = GameObject.FindGameObjectWithTag(targetTag);
-            if (found) target = found.transform;
-            return target != null;
+            if (!string.IsNullOrEmpty(targetTag))
+            {
+                var found = GameObject.FindGameObjectWithTag(targetTag);
+                if (found)
+                {
+                    target = found.transform;
+                    if (logging)
+                        GameLog.Verbose(LogCat.World, $"World streamer following '{found.name}' (tag {targetTag})", this);
+                    return true;
+                }
+            }
+
+            if (fallBackToCamera && Camera.main)
+            {
+                target = Camera.main.transform;
+                GameLog.Warn(LogCat.World,
+                    $"World streamer found nothing tagged '{targetTag}', following the main camera instead. " +
+                    "Assign Target explicitly if that is not what you want.", this);
+                return true;
+            }
+
+            if (Time.unscaledTime >= nextComplaint)
+            {
+                nextComplaint = Time.unscaledTime + 5f;
+                GameLog.Error(LogCat.World,
+                    $"World streamer has no target: Target is empty, nothing carries the tag " +
+                    $"'{targetTag}', and there is no main camera. No cells will load or unload.", this);
+            }
+
+            return false;
         }
 
         private void Refresh()
@@ -128,6 +174,14 @@ namespace RallyGame.World.Streaming
             desired.Clear();
             cells.Around(target.position, loadRadius, scratch);
             foreach (var cell in scratch) desired.Add(cell.sceneName);
+
+            if (!logging) return;
+
+            var coord = cells.CoordAt(target.position);
+            if (coord == lastCoord) return;
+            lastCoord = coord;
+            GameLog.Verbose(LogCat.World,
+                $"Entered cell {coord.x},{coord.y} — want {desired.Count}, have {loaded.Count}", this);
         }
 
         /// Nearest missing cell first, so the ground under the player arrives before

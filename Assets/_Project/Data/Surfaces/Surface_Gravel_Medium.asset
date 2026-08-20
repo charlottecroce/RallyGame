@@ -19,7 +19,7 @@ MonoBehaviour:
   dryGrip: 1
   wetGrip: 0.85
   defaultWidth: 6
-  shoulderWidth: 0.6
+  shoulderWidth: 0.4
   shoulderDrop: 0.1
   heightOffset: 0.06
   physicsMaterial: {fileID: 0}
