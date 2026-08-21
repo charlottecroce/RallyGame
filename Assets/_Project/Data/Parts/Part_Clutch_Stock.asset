@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77518c3fd0997263ca2247ec549a99ed, type: 3}
   m_Name: Part_Clutch_Stock
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Parts.Data.PartDefinition
-  id: Part_New
-  displayName: New Part
+  id: Part_Clutch_Stock
+  displayName: Stock Clutch
   description: 
-  slot: 11
+  slot: 5
   quality: 0.4
   basePrice: 400
   fullRepairCost: 250

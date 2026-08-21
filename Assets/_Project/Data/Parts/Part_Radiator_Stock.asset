@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77518c3fd0997263ca2247ec549a99ed, type: 3}
   m_Name: Part_Radiator_Stock
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Parts.Data.PartDefinition
-  id: Part_New
-  displayName: New Part
+  id: Part_Radiator_Stock
+  displayName: Stock Radiator
   description: 
   slot: 3
   quality: 0.4

@@ -1307,7 +1307,7 @@ MonoBehaviour:
     steers: 0
     driven: 0
     handbraked: 1
-  fallbackDefinition: {fileID: 0}
+  fallbackDefinition: {fileID: 11400000, guid: fa8abcc6d3ed57d99b6b16baa4de6dc2, type: 2}
   headlights:
   - {fileID: 2991441329468421169}
   - {fileID: 3743615421841361264}

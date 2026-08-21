@@ -47,6 +47,8 @@ MonoBehaviour:
     m_RotationOrder: 4
   idleRpm: 900
   redlineRpm: 6800
+  engineResponse: 7
+  engineBrakingNm: 60
   gearRatios:
   - 3.4
   - 2.1
@@ -56,13 +58,55 @@ MonoBehaviour:
   reverseRatio: 3.2
   finalDrive: 4.1
   shiftTime: 0.35
+  awdFrontTorqueSplit: 0.4
   maxSteerAngle: 32
   highSpeedSteerScale: 0.35
   brakeTorque: 2200
   handbrakeTorque: 3000
+  frontBrakeBias: 0.64
   baseForwardGrip: 1.4
   baseSidewaysGrip: 1.5
   topSpeedKph: 140
+  cgHeightM: 0.52
+  frontWeightBias: 0.58
+  frontRollShare: 0.52
+  loadSensitivity:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1.3
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 3
+      value: 0.72
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  deriveDragFromTopSpeed: 1
+  aeroDrag: 0.45
+  downforceCoefficient: 0.55
+  aeroBalanceFront: 0.45
   defaultParts:
   - {fileID: 11400000, guid: 95f7d5888d0c4fcd7b899c8235a4e61d, type: 2}
   - {fileID: 11400000, guid: fc3f8ddedb54ab31dadbf72d765b829f, type: 2}
@@ -76,4 +120,4 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2d2f9405e66952619bfb9be211f56dca, type: 2}
   - {fileID: 11400000, guid: 89f93ac8298cb0d1b920bfcf4931d359, type: 2}
   - {fileID: 11400000, guid: 991834d1c52e2cbfe98da8ebc6776f78, type: 2}
-  defaultTireCompound: 0
+  defaultTireCompound: 1

@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77518c3fd0997263ca2247ec549a99ed, type: 3}
   m_Name: Part_Headlights_Stock
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Parts.Data.PartDefinition
-  id: Part_New
-  displayName: New Part
+  id: Part_Headlights_Stock
+  displayName: Stock Headlights
   description: 
   slot: 9
   quality: 0.4
