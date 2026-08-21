@@ -122,6 +122,30 @@ namespace RallyGame.World.Roads
         [SerializeField] private Vector3 coneRotationOffset;
         [Range(0f, 30f)][SerializeField] private float coneYawJitter = 8f;
 
+        [Header("Trash")]
+        [Tooltip("Roadside litter prefabs. One is picked at random for each spawn point, so mix " +
+                 "a few different pieces in here for variety.")]
+        [SerializeField] private GameObject[] trashPrefabs;
+        [Tooltip("Baseline average pieces per metre of road, away from junctions. Try something " +
+                 "small like 0.03-0.08 — this is a scatter, not a carpet.")]
+        [SerializeField] private float trashDensityPerMetre = 0.05f;
+        [Tooltip("Closest a piece of trash can land from the road edge, metres. Can be 0 or even " +
+                 "slightly negative to let a few pieces sit right on the shoulder.")]
+        [SerializeField] private float trashMinOffset = 0.2f;
+        [Tooltip("Furthest a piece of trash can land from the road edge, metres. Each piece rolls " +
+                 "an independent random distance between Min and Max, which is what gives the " +
+                 "'some right alongside, some further out' spread instead of a neat line.")]
+        [SerializeField] private float trashMaxOffset = 5f;
+        [SerializeField] private RoadSide trashSides = RoadSide.Both;
+        [Tooltip("Density is multiplied by this within range of a junction, so intersections read " +
+                 "as noticeably messier than open road.")]
+        [SerializeField] private float trashJunctionDensityMultiplier = 4f;
+        [Tooltip("Extra radius beyond a junction's own radius where the density boost applies.")]
+        [SerializeField] private float trashJunctionBoostRadius = 8f;
+        [Tooltip("Different seeds give different scatters without touching density or offsets.")]
+        [SerializeField] private int trashSeed = 54321;
+        [SerializeField] private int maxTrash = 3000;
+
         [Header("Props (shared)")]
         [Tooltip("Raycast each prop onto the terrain instead of leaving it on the road plane.")]
         [SerializeField] private bool propsSnapToGround = true;
@@ -365,15 +389,40 @@ namespace RallyGame.World.Roads
                 maxCount = budget
             };
 
+        /// Roadside litter scatter settings. Reuses the shared ground-snap config so
+        /// trash beds into the terrain the same way bollards and cones do.
+        private RoadTrashSettings TrashSettings(int budget) => new RoadTrashSettings
+        {
+            roadHalfWidth = Width * 0.5f,
+            minLateralOffset = trashMinOffset,
+            maxLateralOffset = trashMaxOffset,
+            baseDensityPerMetre = trashDensityPerMetre,
+            junctionDensityMultiplier = trashJunctionDensityMultiplier,
+            junctionBoostRadius = trashJunctionBoostRadius,
+            sides = trashSides,
+            snapToGround = propsSnapToGround,
+            alignToGroundNormal = propsAlignToGround,
+            groundMask = groundMask,
+            probeUp = probeUp,
+            probeDown = probeDown,
+            prefabCount = trashPrefabs != null ? trashPrefabs.Length : 0,
+            seed = trashSeed,
+            maxCount = Mathf.Max(0, budget)
+        };
+
         // ---- props ---------------------------------------------------------
 
         private void PlaceProps(SplineContainer container, List<List<RoadSample>> strands)
         {
-            if (bollardPrefab == null && conePrefab == null) return;
+            bool anyTrash = trashPrefabs != null && trashPrefabs.Length > 0 && trashDensityPerMetre > 0.0001f
+                            && trashSides != RoadSide.None;
 
-            Transform bollardRoot = null, coneRoot = null;
-            int bollards = 0, cones = 0;
+            if (bollardPrefab == null && conePrefab == null && !anyTrash) return;
+
+            Transform bollardRoot = null, coneRoot = null, trashRoot = null;
+            int bollards = 0, cones = 0, trash = 0;
             int budget = Mathf.Max(0, maxProps);
+            int trashBudget = Mathf.Max(0, maxTrash);
 
             for (int i = 0; i < strands.Count; i++)
             {
@@ -382,9 +431,9 @@ namespace RallyGame.World.Roads
 
                 bool closed = i < container.Splines.Count && container.Splines[i].Closed;
                 int left = budget - bollards - cones;
-                if (left <= 0) break;
+                if (left <= 0 && !anyTrash) break;
 
-                if (bollardPrefab && bollardInterval > 0.1f && bollardSides != RoadSide.None)
+                if (bollardPrefab && bollardInterval > 0.1f && bollardSides != RoadSide.None && left > 0)
                 {
                     var placed = RoadPropPlacer.Place(
                         strand, closed,
@@ -415,14 +464,36 @@ namespace RallyGame.World.Roads
                         foreach (var p in placed) Spawn(conePrefab, coneRoot, p, cones++, "Cone_");
                     }
                 }
+
+                // Trash has its own budget, independent of the bollard/cone budget,
+                // and is scattered rather than evenly spaced — see PlaceTrash.
+                if (anyTrash && trash < trashBudget)
+                {
+                    var placed = RoadPropPlacer.PlaceTrash(strand, closed, TrashSettings(trashBudget - trash), junctions);
+
+                    if (placed.Count > 0)
+                    {
+                        if (trashRoot == null) trashRoot = MakeRoot("Trash");
+                        foreach (var p in placed)
+                        {
+                            var prefab = trashPrefabs[((p.variant % trashPrefabs.Length) + trashPrefabs.Length) % trashPrefabs.Length];
+                            if (prefab) Spawn(prefab, trashRoot, p, trash++, "Trash_");
+                        }
+                    }
+                }
             }
 
             GameLog.Action(LogCat.World, "Road props placed",
-                           $"'{name}': {bollards} bollard(s), {cones} cone(s) over {junctions.Count} junction(s)", this);
+                           $"'{name}': {bollards} bollard(s), {cones} cone(s), {trash} trash piece(s) " +
+                           $"over {junctions.Count} junction(s)", this);
 
             if (bollards + cones >= budget && budget > 0)
                 GameLog.Warn(LogCat.World,
                     $"Road '{name}' hit the {budget}-prop cap — raise Max Props or widen the intervals.", this);
+
+            if (anyTrash && trash >= trashBudget && trashBudget > 0)
+                GameLog.Warn(LogCat.World,
+                    $"Road '{name}' hit the {trashBudget}-piece trash cap — raise Max Trash or lower the density.", this);
         }
 
         private Transform MakeRoot(string label)

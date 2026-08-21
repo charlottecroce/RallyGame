@@ -10,6 +10,8 @@ namespace RallyGame.World.Roads
     {
         public Vector3 position;
         public Quaternion rotation;
+        [Tooltip("Which prefab variant this point picked, for callers with more than one prop mesh (trash).")]
+        public int variant;
     }
 
     public enum RoadSide { Both = 0, Left = 1, Right = 2, None = 3 }
@@ -49,6 +51,35 @@ namespace RallyGame.World.Roads
         public float probeUp;
         public float probeDown;
         public float yawJitter;        // degrees, seeded so a rebake reproduces the same scene
+        public int seed;
+        public int maxCount;
+    }
+
+    /// Settings for the randomised roadside litter scatter. Unlike the interval-based
+    /// bollard/cone placement above, trash is a Poisson-style scatter: irregular
+    /// spacing along the road, a random distance from the edge (some right up against
+    /// the tarmac, some well into the verge), and denser near junctions where traffic
+    /// actually stops and idles.
+    public struct RoadTrashSettings
+    {
+        public float roadHalfWidth;
+        [Tooltip("Nearest a piece can land from the road edge, metres.")]
+        public float minLateralOffset;
+        [Tooltip("Furthest a piece can land from the road edge, metres.")]
+        public float maxLateralOffset;
+        [Tooltip("Average pieces per metre of road, baseline (away from junctions).")]
+        public float baseDensityPerMetre;
+        [Tooltip("Density is multiplied by this near a junction.")]
+        public float junctionDensityMultiplier;
+        [Tooltip("Extra radius beyond a junction's own radius where the density boost applies.")]
+        public float junctionBoostRadius;
+        public RoadSide sides;
+        public bool snapToGround;
+        public bool alignToGroundNormal;
+        public LayerMask groundMask;
+        public float probeUp;
+        public float probeDown;
+        public int prefabCount;   // how many prefab variants the caller has, for picking one per point
         public int seed;
         public int maxCount;
     }
@@ -95,6 +126,71 @@ namespace RallyGame.World.Roads
 
                 if (left) TryAdd(pos - across * offset, fwd, across, -1f, up, s, junctions, filter, margin, rng, result);
                 if (right) TryAdd(pos + across * offset, fwd, across, 1f, up, s, junctions, filter, margin, rng, result);
+            }
+
+            return result;
+        }
+
+        /// Randomised roadside litter scatter. Walks the strand in small fixed steps
+        /// and rolls, at every step, whether a piece spawns there (a Poisson-style
+        /// process) — this is what makes the result look scattered rather than
+        /// ruler-straight like the bollards. The per-step spawn probability increases
+        /// near junctions, and each spawned piece lands at a random distance between
+        /// minLateralOffset and maxLateralOffset from the road edge (so some sit right
+        /// on the shoulder and some are flung well into the verge) with a fully random
+        /// yaw.
+        public static List<RoadPropPlacement> PlaceTrash(List<RoadSample> samples, bool closed,
+                                                          in RoadTrashSettings s,
+                                                          IReadOnlyList<RoadJunction> junctions)
+        {
+            var result = new List<RoadPropPlacement>();
+            if (samples == null || samples.Count < 2 || s.sides == RoadSide.None) return result;
+            if (s.baseDensityPerMetre <= 0f) return result;
+
+            float total = samples[samples.Count - 1].distance;
+            if (total <= 0.01f) return result;
+
+            int max = s.maxCount > 0 ? s.maxCount : int.MaxValue;
+            const float scanStep = 1f;   // metres between spawn rolls; irregular result comes from the RNG, not this
+
+            var rng = new System.Random(s.seed);
+            int cursor = 1;
+
+            bool left = s.sides == RoadSide.Both || s.sides == RoadSide.Left;
+            bool right = s.sides == RoadSide.Both || s.sides == RoadSide.Right;
+
+            for (float d = 0f; d < total && result.Count < max; d += scanStep)
+            {
+                Evaluate(samples, d, ref cursor, out Vector3 pos, out Vector3 fwd, out Vector3 up);
+
+                Vector3 across = Vector3.Cross(up, fwd);
+                if (across.sqrMagnitude < 1e-6f) continue;
+                across.Normalize();
+
+                float density = s.baseDensityPerMetre * JunctionDensityMultiplier(pos, junctions,
+                    s.junctionBoostRadius, s.junctionDensityMultiplier);
+
+                // Expected count this step; can exceed 1 near a junction, in which
+                // case multiple pieces can land in the same short span.
+                float expected = density * scanStep;
+
+                while (expected > 0f && result.Count < max)
+                {
+                    if (rng.NextDouble() > System.Math.Min(1.0, expected)) break;
+                    expected -= 1f;
+
+                    bool useLeft = left && (!right || rng.NextDouble() < 0.5);
+                    if (!useLeft && !right) continue;
+                    float side = useLeft ? -1f : 1f;
+
+                    // Random distance from the edge — this is the "some right
+                    // alongside, some further away" spread.
+                    float lateral = s.roadHalfWidth +
+                        Mathf.Lerp(s.minLateralOffset, s.maxLateralOffset, (float)rng.NextDouble());
+                    Vector3 at = pos + across * (lateral * side);
+
+                    TryAddTrash(at, s, rng, result);
+                }
             }
 
             return result;
@@ -150,6 +246,49 @@ namespace RallyGame.World.Roads
             rot *= Quaternion.Euler(s.rotationOffset);
 
             into.Add(new RoadPropPlacement { position = at, rotation = rot });
+        }
+
+        /// Ground-snaps and applies a fully random yaw — litter has no "facing", it
+        /// just landed however it landed.
+        private static void TryAddTrash(Vector3 at, in RoadTrashSettings s, System.Random rng,
+                                        List<RoadPropPlacement> into)
+        {
+            Vector3 normal = Vector3.up;
+            if (s.snapToGround &&
+                UnityEngine.Physics.Raycast(at + Vector3.up * s.probeUp, Vector3.down, out var hit,
+                                            s.probeUp + s.probeDown, s.groundMask,
+                                            QueryTriggerInteraction.Ignore))
+            {
+                at = hit.point;
+                if (s.alignToGroundNormal) normal = hit.normal;
+            }
+
+            float yaw = (float)(rng.NextDouble() * 360.0);
+            Quaternion tilt = s.alignToGroundNormal ? Quaternion.FromToRotation(Vector3.up, normal) : Quaternion.identity;
+            Quaternion rot = tilt * Quaternion.Euler(0f, yaw, 0f);
+
+            int variant = s.prefabCount > 0 ? rng.Next(s.prefabCount) : 0;
+
+            into.Add(new RoadPropPlacement { position = at, rotation = rot, variant = variant });
+        }
+
+        /// 1 everywhere except within (junction.radius + boostRadius) of a junction,
+        /// where it returns the multiplier. Cheap linear scan — junction counts are
+        /// tiny compared to prop counts.
+        private static float JunctionDensityMultiplier(Vector3 pos, IReadOnlyList<RoadJunction> junctions,
+                                                        float boostRadius, float multiplier)
+        {
+            if (junctions == null || junctions.Count == 0 || multiplier <= 1f) return 1f;
+
+            for (int i = 0; i < junctions.Count; i++)
+            {
+                float r = junctions[i].radius + boostRadius;
+                float dx = junctions[i].position.x - pos.x;
+                float dz = junctions[i].position.z - pos.z;
+                if (dx * dx + dz * dz <= r * r) return multiplier;
+            }
+
+            return 1f;
         }
 
         /// Position/frame at an arc length. The cursor only ever moves forward, so the
