@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using RallyGame.Core;
 using RallyGame.Parts.Data;
 
 namespace RallyGame.Vehicles.Data
@@ -10,8 +11,14 @@ namespace RallyGame.Vehicles.Data
     [CreateAssetMenu(menuName = "Rally/Definitions/Car", fileName = "Car_")]
     public class CarDefinition : ScriptableObject
     {
+        /// Matches the CreateAssetMenu fileName above.
+        public const string IdPrefix = "Car_";
+
         [Header("Identity")]
-        public string id = "Car_New";
+        [Tooltip("Stable save ID. Stamped from the file name on a new asset; no inline default, " +
+                 "because a default that looks real ends up in save files. Never change it once " +
+                 "a save exists.")]
+        public string id;
         public string displayName = "New Car";
         public Sprite thumbnail;
         [Tooltip("Prefab with Rigidbody + CarController + CarAssembly on the root.")]
@@ -89,13 +96,16 @@ namespace RallyGame.Vehicles.Data
         // Restored: GarageState and OwnedCar both read these on first creation.
 
         [Header("Default build")]
-        [Tooltip("Parts fitted when this car is first created, one per slot.")]
+        [Tooltip("Parts fitted when this car is first created, one per slot. These are asset " +
+                 "references, but they are fitted by ID — so a part in here whose ID does not " +
+                 "resolve through the DefinitionDatabase leaves the slot empty on a new game. " +
+                 "Run the database's Audit Definition IDs to catch that.")]
         public List<PartDefinition> defaultParts = new List<PartDefinition>();
         public TireCompound defaultTireCompound = TireCompound.Hard;
 
         private void OnValidate()
         {
-            if (string.IsNullOrEmpty(id)) id = name;
+            id = DefinitionId.Resolve(id, name, IdPrefix);
             cgHeightM = Mathf.Clamp(cgHeightM, 0.15f, 1.2f);
         }
     }

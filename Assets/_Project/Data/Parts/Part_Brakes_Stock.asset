@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77518c3fd0997263ca2247ec549a99ed, type: 3}
   m_Name: Part_Brakes_Stock
   m_EditorClassIdentifier: Assembly-CSharp::RallyGame.Parts.Data.PartDefinition
-  id: Part_Bodywork_Stock
+  id: Part_Brakes_Stock
   displayName: Stock Brakes
   description: 
   slot: 8

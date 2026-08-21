@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using RallyGame.Core;
 
 namespace RallyGame.Races.Data
 {
@@ -8,6 +9,9 @@ namespace RallyGame.Races.Data
     [CreateAssetMenu(menuName = "Rally/Definitions/Stage", fileName = "Stage_")]
     public class StageDefinition : ScriptableObject
     {
+        /// Matches the CreateAssetMenu fileName above.
+        public const string IdPrefix = "Stage_";
+
         [System.Serializable]
         public class Node
         {
@@ -18,7 +22,10 @@ namespace RallyGame.Races.Data
         }
 
         [Header("Identity")]
-        public string id = "Stage_New";
+        [Tooltip("Stable save ID. Stamped from the file name on a new asset; no inline default, " +
+                 "because a default that looks real ends up in save files. Never change it once " +
+                 "a save exists.")]
+        public string id;
         public string displayName = "New Stage";
         public string locationId;
         [Tooltip("Reverse running of the same route (GDD: 4 stages x 2 directions).")]
@@ -48,6 +55,6 @@ namespace RallyGame.Races.Data
             return list;
         }
 
-        private void OnValidate() { if (string.IsNullOrEmpty(id)) id = name; }
+        private void OnValidate() { id = DefinitionId.Resolve(id, name, IdPrefix); }
     }
 }

@@ -146,6 +146,29 @@ namespace RallyGame.World.Roads
         [SerializeField] private int trashSeed = 54321;
         [SerializeField] private int maxTrash = 3000;
 
+        [Header("Trash — bedding into the ground")]
+        [Tooltip("Lie each piece on the terrain under it. Trash-only, so bollards and cones " +
+           "can keep standing vertical.")]
+        [SerializeField] private bool trashAlignToGround = true;
+        [Range(0f, 1f)]
+        [Tooltip("How much of the ground's tilt to take. 0.8-1 for flat litter (bags, paper, " +
+                 "flattened cans); 0.3-0.5 for pieces with height, like bottles and boxes.")]
+        [SerializeField] private float trashNormalBlend = 1f;
+        [Tooltip("Tilt ceiling, whatever the ground does. Stops a piece on a bank reading as " +
+                 "glued to a wall. 0 = no limit.")]
+        [SerializeField] private float trashMaxTiltDegrees = 40f;
+        [Tooltip("Radius of the probe triangle that reads the slope, metres. Set it to roughly " +
+                 "the piece's own footprint. 0 falls back to the single raycast normal, which " +
+                 "snaps facet to facet on a low-poly terrain.")]
+        [SerializeField] private float trashFootprintRadius = 0.35f;
+        [Tooltip("Moved along the ground normal after snapping. Small NEGATIVE values bed the " +
+                 "piece in so no gap shows under it; positive lifts a buried pivot.")]
+        [SerializeField] private float trashVerticalOffset = -0.01f;
+        [Tooltip("Skip ground steeper than this. 0 = place anywhere.")]
+        [SerializeField] private float trashMaxSlopeDegrees = 55f;
+        [Tooltip("Drop pieces that found no ground under them.")]
+        [SerializeField] private bool trashRequireGround = true;
+
         [Header("Props (shared)")]
         [Tooltip("Raycast each prop onto the terrain instead of leaving it on the road plane.")]
         [SerializeField] private bool propsSnapToGround = true;
@@ -389,8 +412,9 @@ namespace RallyGame.World.Roads
                 maxCount = budget
             };
 
-        /// Roadside litter scatter settings. Reuses the shared ground-snap config so
-        /// trash beds into the terrain the same way bollards and cones do.
+        /// Roadside litter scatter settings. Shares the props ground-probe config
+        /// (mask, probe distances) but keeps its own ALIGNMENT: a bollard should stand
+        /// vertical on a slope, a crushed can should lie flat on it.
         private RoadTrashSettings TrashSettings(int budget) => new RoadTrashSettings
         {
             roadHalfWidth = Width * 0.5f,
@@ -400,14 +424,21 @@ namespace RallyGame.World.Roads
             junctionDensityMultiplier = trashJunctionDensityMultiplier,
             junctionBoostRadius = trashJunctionBoostRadius,
             sides = trashSides,
-            snapToGround = propsSnapToGround,
-            alignToGroundNormal = propsAlignToGround,
             groundMask = groundMask,
             probeUp = probeUp,
             probeDown = probeDown,
             prefabCount = trashPrefabs != null ? trashPrefabs.Length : 0,
             seed = trashSeed,
-            maxCount = Mathf.Max(0, budget)
+            maxCount = Mathf.Max(0, budget),
+
+            snapToGround = propsSnapToGround,
+            alignToGroundNormal = trashAlignToGround,
+            normalBlend = trashNormalBlend,
+            maxTiltDegrees = trashMaxTiltDegrees,
+            footprintRadius = trashFootprintRadius,
+            verticalOffset = trashVerticalOffset,
+            maxSlopeDegrees = trashMaxSlopeDegrees,
+            requireGround = trashRequireGround
         };
 
         // ---- props ---------------------------------------------------------

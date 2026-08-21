@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using RallyGame.Core;
 
 namespace RallyGame.Races.Data
 {
@@ -7,7 +8,13 @@ namespace RallyGame.Races.Data
     [CreateAssetMenu(menuName = "Rally/Definitions/Location", fileName = "Location_")]
     public class LocationDefinition : ScriptableObject
     {
-        public string id = "Location_New";
+        /// Matches the CreateAssetMenu fileName above.
+        public const string IdPrefix = "Location_";
+
+        [Tooltip("Stable save ID. Stamped from the file name on a new asset; no inline default, " +
+                 "because a default that looks real ends up in save files (a RaceEvent stores " +
+                 "locationId). Never change it once a save exists.")]
+        public string id;
         public string displayName = "New Location";
         public List<StageDefinition> stages = new List<StageDefinition>();
 
@@ -24,6 +31,6 @@ namespace RallyGame.Races.Data
         public int rallyPurse = 6000;
         public int fieldSize = 24;
 
-        private void OnValidate() { if (string.IsNullOrEmpty(id)) id = name; }
+        private void OnValidate() { id = DefinitionId.Resolve(id, name, IdPrefix); }
     }
 }

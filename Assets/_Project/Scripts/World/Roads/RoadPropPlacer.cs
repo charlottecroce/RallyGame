@@ -60,6 +60,9 @@ namespace RallyGame.World.Roads
     /// spacing along the road, a random distance from the edge (some right up against
     /// the tarmac, some well into the verge), and denser near junctions where traffic
     /// actually stops and idles.
+    ///
+    /// Trash carries its own alignment settings rather than sharing the props ones: a
+    /// bollard should stand vertical on a slope, a crushed can should lie flat on it.
     public struct RoadTrashSettings
     {
         public float roadHalfWidth;
@@ -74,14 +77,29 @@ namespace RallyGame.World.Roads
         [Tooltip("Extra radius beyond a junction's own radius where the density boost applies.")]
         public float junctionBoostRadius;
         public RoadSide sides;
-        public bool snapToGround;
-        public bool alignToGroundNormal;
         public LayerMask groundMask;
         public float probeUp;
         public float probeDown;
         public int prefabCount;   // how many prefab variants the caller has, for picking one per point
         public int seed;
         public int maxCount;
+
+        // ---- bedding into the ground ----
+        public bool snapToGround;
+        [Tooltip("Lie each piece on the terrain under it instead of leaving it level.")]
+        public bool alignToGroundNormal;
+        [Tooltip("How much of the ground's tilt to take. 1 = lie flat on the slope.")]
+        public float normalBlend;
+        [Tooltip("Never tilt past this, whatever the ground does. 0 = no limit.")]
+        public float maxTiltDegrees;
+        [Tooltip("Radius of the probe triangle used to read the slope. 0 = single-raycast normal.")]
+        public float footprintRadius;
+        [Tooltip("Moved along the ground normal after snapping. Negative beds the piece in.")]
+        public float verticalOffset;
+        [Tooltip("Skip ground steeper than this. 0 = place anywhere.")]
+        public float maxSlopeDegrees;
+        [Tooltip("Drop pieces that found no ground, instead of leaving them at road height.")]
+        public bool requireGround;
     }
 
     /// Pure placement maths: samples in, transforms out. Same shape as
@@ -248,28 +266,91 @@ namespace RallyGame.World.Roads
             into.Add(new RoadPropPlacement { position = at, rotation = rot });
         }
 
-        /// Ground-snaps and applies a fully random yaw — litter has no "facing", it
-        /// just landed however it landed.
+        /// Ground-snaps litter and lies it down on the terrain underneath it.
+        ///
+        /// The anchor is the centre hit, but the ORIENTATION comes from a plane fitted
+        /// through three probes a footprint apart. A single raycast returns the normal of
+        /// ONE triangle, which flips hard from facet to facet on a low-poly terrain and
+        /// leaves a flat piece hovering on one corner. A bottle lying across a rut should
+        /// sit on the rut, not on whichever facet its pivot happened to land on.
         private static void TryAddTrash(Vector3 at, in RoadTrashSettings s, System.Random rng,
                                         List<RoadPropPlacement> into)
         {
             Vector3 normal = Vector3.up;
-            if (s.snapToGround &&
-                UnityEngine.Physics.Raycast(at + Vector3.up * s.probeUp, Vector3.down, out var hit,
-                                            s.probeUp + s.probeDown, s.groundMask,
-                                            QueryTriggerInteraction.Ignore))
+
+            if (s.snapToGround)
             {
-                at = hit.point;
-                if (s.alignToGroundNormal) normal = hit.normal;
+                if (Probe(at, s, out Vector3 centre, out Vector3 hitNormal))
+                {
+                    at = centre;
+                    normal = s.footprintRadius > 0.01f ? FitNormal(centre, s, hitNormal) : hitNormal;
+                }
+                else if (s.requireGround) return;   // a floating crisp packet is worse than none
             }
 
+            if (!s.alignToGroundNormal) normal = Vector3.up;
+
+            // Litter does not sit on cliffs, and an aligned piece on a steep face reads
+            // as a decal stuck to a wall. Cheaper to not place it at all.
+            if (s.maxSlopeDegrees > 0.01f && Vector3.Angle(normal, Vector3.up) > s.maxSlopeDegrees) return;
+
+            // Blend first, then clamp: "mostly follow the ground, but never past 40
+            // degrees" without needing a second set of probes.
+            Vector3 aligned = s.normalBlend < 0.999f
+                ? Vector3.Slerp(Vector3.up, normal, Mathf.Clamp01(s.normalBlend)).normalized
+                : normal;
+
+            if (s.maxTiltDegrees > 0.01f && Vector3.Angle(Vector3.up, aligned) > s.maxTiltDegrees)
+                aligned = Vector3.RotateTowards(Vector3.up, aligned, s.maxTiltDegrees * Mathf.Deg2Rad, 0f).normalized;
+
+            at += aligned * s.verticalOffset;
+
+            // Yaw is right-multiplied, so it turns about the piece's own (already tilted)
+            // up axis — the piece spins in the ground plane instead of the world plane.
             float yaw = (float)(rng.NextDouble() * 360.0);
-            Quaternion tilt = s.alignToGroundNormal ? Quaternion.FromToRotation(Vector3.up, normal) : Quaternion.identity;
-            Quaternion rot = tilt * Quaternion.Euler(0f, yaw, 0f);
+            Quaternion rot = Quaternion.FromToRotation(Vector3.up, aligned) * Quaternion.Euler(0f, yaw, 0f);
 
             int variant = s.prefabCount > 0 ? rng.Next(s.prefabCount) : 0;
 
             into.Add(new RoadPropPlacement { position = at, rotation = rot, variant = variant });
+        }
+
+        private static bool Probe(Vector3 at, in RoadTrashSettings s, out Vector3 point, out Vector3 normal)
+        {
+            if (UnityEngine.Physics.Raycast(at + Vector3.up * s.probeUp, Vector3.down, out var hit,
+                                            s.probeUp + s.probeDown, s.groundMask,
+                                            QueryTriggerInteraction.Ignore))
+            {
+                point = hit.point; normal = hit.normal; return true;
+            }
+
+            point = at; normal = Vector3.up; return false;
+        }
+
+        // 120 degrees apart on a circle. World-axis aligned is fine: the piece gets a
+        // fully random yaw afterwards anyway.
+        private static readonly Vector3[] fitDirs =
+        {
+            new Vector3(0f, 0f, 1f),
+            new Vector3(0.8660254f, 0f, -0.5f),
+            new Vector3(-0.8660254f, 0f, -0.5f)
+        };
+        private static readonly Vector3[] fitPoints = new Vector3[3];
+
+        /// Plane through three probes around the anchor. Falls back to the single-hit
+        /// normal if any probe misses — a piece at the lip of a hole should follow the
+        /// ground it is on, not tilt toward the void.
+        private static Vector3 FitNormal(Vector3 centre, in RoadTrashSettings s, Vector3 fallback)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                if (!Probe(centre + fitDirs[i] * s.footprintRadius, s, out fitPoints[i], out _))
+                    return fallback;
+            }
+
+            Vector3 n = Vector3.Cross(fitPoints[1] - fitPoints[0], fitPoints[2] - fitPoints[0]);
+            if (n.y < 0f) n = -n;
+            return n.sqrMagnitude > 1e-8f ? n.normalized : fallback;
         }
 
         /// 1 everywhere except within (junction.radius + boostRadius) of a junction,

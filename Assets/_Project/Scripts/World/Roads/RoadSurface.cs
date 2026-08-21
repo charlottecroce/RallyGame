@@ -18,8 +18,15 @@ namespace RallyGame.World.Roads
     [CreateAssetMenu(menuName = "Rally/Definitions/Road Surface", fileName = "Surface_")]
     public class RoadSurface : ScriptableObject
     {
+        /// Matches the CreateAssetMenu fileName above. The existing surface assets use a
+        /// lowercase convention ("tarmac", "gravel_medium") — those are authored IDs and
+        /// are left alone; only the untouched placeholder is replaced.
+        public const string IdPrefix = "Surface_";
+
         [Header("Identity")]
-        public string id = "surface_new";
+        [Tooltip("Stable ID. Stamped from the file name on a new asset; no inline default, " +
+                 "because a default that looks real gets referenced as though it were one.")]
+        public string id;
         public string displayName = "New Surface";
 
         [Header("Look")]
@@ -62,7 +69,7 @@ namespace RallyGame.World.Roads
 
         private void OnValidate()
         {
-            if (string.IsNullOrEmpty(id)) id = name;
+            id = DefinitionId.Resolve(id, name, IdPrefix);
             defaultWidth = Mathf.Max(1f, defaultWidth);
             uvTilesPerMetre = Mathf.Max(0.001f, uvTilesPerMetre);
         }

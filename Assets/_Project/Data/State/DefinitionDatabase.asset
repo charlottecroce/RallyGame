@@ -27,5 +27,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 991834d1c52e2cbfe98da8ebc6776f78, type: 2}
   allCars:
   - {fileID: 11400000, guid: fa8abcc6d3ed57d99b6b16baa4de6dc2, type: 2}
-  allStages: []
-  allLocations: []
+  allStages:
+  - {fileID: 11400000, guid: 84ceb3e19d90d88c38fcd9f849acf1f5, type: 2}
+  allLocations:
+  - {fileID: 11400000, guid: 2cc660b36b51a57da8129010c464e894, type: 2}

@@ -1,4 +1,5 @@
 using UnityEngine;
+using RallyGame.Core;
 
 namespace RallyGame.Parts.Data
 {
@@ -14,9 +15,16 @@ namespace RallyGame.Parts.Data
     [CreateAssetMenu(menuName = "Rally/Definitions/Part", fileName = "Part_")]
     public class PartDefinition : ScriptableObject
     {
+        /// Matches the CreateAssetMenu fileName above. DefinitionId uses it to
+        /// recognise an ID nobody has filled in yet.
+        public const string IdPrefix = "Part_";
+
         [Header("Identity")]
-        [Tooltip("Stable save ID. Never rename after a save exists.")]
-        public string id = "Part_New";
+        [Tooltip("Stable save ID. Left blank on a new asset and stamped from the file name — " +
+                 "there is deliberately no inline default, because a default that looks like a " +
+                 "real ID gets written into save files and then fails to resolve forever after. " +
+                 "Never change it once a save exists.")]
+        public string id;
         public string displayName = "New Part";
         [TextArea] public string description;
         public PartSlot slot;
@@ -57,6 +65,6 @@ namespace RallyGame.Parts.Data
         public int PriceForCondition(float condition) => Mathf.RoundToInt(basePrice * Mathf.Lerp(0.35f, 1f, condition));
         public int RepairCost(float condition) => Mathf.RoundToInt(fullRepairCost * (1f - Mathf.Clamp01(condition)));
 
-        private void OnValidate() { if (string.IsNullOrEmpty(id)) id = name; }
+        private void OnValidate() { id = DefinitionId.Resolve(id, name, IdPrefix); }
     }
 }
